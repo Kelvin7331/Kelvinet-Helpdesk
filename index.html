@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelvinet Smart IT Helpdesk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="chatbot.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     AUTH SCREEN
+═══════════════════════════════════════ -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo"><i class="fas fa-shield-halved"></i></div>
+      <h1>Kelvinet <span>Helpdesk</span></h1>
+      <p>Smart IT Support Platform</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="loginTabBtn">Sign In</button>
+      <button class="auth-tab" id="signupTabBtn">Create Account</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="loginForm" class="auth-form">
+      <div class="form-row">
+        <label for="loginEmail">Email Address</label>
+        <div class="input-icon-wrap">
+          <i class="fas fa-envelope"></i>
+          <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="loginPassword">Password</label>
+        <div class="input-icon-wrap">
+          <i class="fas fa-lock"></i>
+          <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+          <button class="pw-toggle" id="loginPwToggle" type="button" aria-label="Toggle password visibility">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+      <div class="auth-error" id="loginError" role="alert"></div>
+      <button class="btn auth-submit" id="loginBtn">
+        <i class="fas fa-arrow-right-to-bracket"></i> Sign In
+      </button>
+      <button class="link-btn auth-forgot" id="forgotPwBtn">Forgot password?</button>
+    </div>
+
+    <!-- SIGNUP -->
+    <div id="signupForm" class="auth-form" style="display:none;">
+      <div class="form-row">
+        <label for="signupName">Full Name</label>
+        <div class="input-icon-wrap">
+          <i class="fas fa-user"></i>
+          <input type="text" id="signupName" placeholder="John Doe" autocomplete="name">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="signupEmail">Email Address</label>
+        <div class="input-icon-wrap">
+          <i class="fas fa-envelope"></i>
+          <input type="email" id="signupEmail" placeholder="you@company.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="signupPassword">Password</label>
+        <div class="input-icon-wrap">
+          <i class="fas fa-lock"></i>
+          <input type="password" id="signupPassword" placeholder="Min. 8 characters" autocomplete="new-password">
+          <button class="pw-toggle" id="signupPwToggle" type="button" aria-label="Toggle password visibility">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="signupRole">Account Type</label>
+        <div class="input-icon-wrap">
+          <i class="fas fa-id-badge"></i>
+          <select id="signupRole">
+            <option value="user">User — I need IT support</option>
+            <option value="engineer">Engineer — I provide IT support</option>
+          </select>
+        </div>
+        <span class="field-hint"><i class="fas fa-circle-info"></i> Admin accounts are created by existing admins only.</span>
+      </div>
+      <div class="auth-error" id="signupError" role="alert"></div>
+      <button class="btn auth-submit" id="signupBtn">
+        <i class="fas fa-user-plus"></i> Create Account
+      </button>
+    </div>
+
+    <div class="auth-footer">
+      <span>Powered by <strong>Kelvinet Technologies</strong></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     APP SHELL (shown after login)
+═══════════════════════════════════════ -->
+<div id="appShell" style="display:none;">
+
+  <!-- TOP NAV -->
+  <nav class="topnav" role="navigation" aria-label="Main navigation">
+    <div class="topnav-brand">
+      <span class="brand-icon"><i class="fas fa-shield-halved"></i></span>
+      <span class="brand-name">Kelvinet <span class="brand-accent">Helpdesk</span></span>
+    </div>
+    <div class="topnav-tabs" id="navTabs" role="tablist">
+      <button class="nav-tab active" data-view="chat" role="tab" aria-selected="true">
+        <i class="fas fa-comments"></i> <span class="tab-label">Support Chat</span>
+      </button>
+      <button class="nav-tab" data-view="tickets" role="tab" aria-selected="false">
+        <i class="fas fa-ticket"></i> <span class="tab-label">Tickets</span>
+        <span class="badge" id="openBadge"></span>
+      </button>
+      <button class="nav-tab staff-only" data-view="dashboard" role="tab" aria-selected="false" style="display:none;">
+        <i class="fas fa-chart-line"></i> <span class="tab-label">Dashboard</span>
+      </button>
+      <button class="nav-tab staff-only" data-view="kb" role="tab" aria-selected="false" style="display:none;">
+        <i class="fas fa-book-open"></i> <span class="tab-label">Knowledge Base</span>
+      </button>
+      <button class="nav-tab admin-only" data-view="users" role="tab" aria-selected="false" style="display:none;">
+        <i class="fas fa-users"></i> <span class="tab-label">Users</span>
+      </button>
+    </div>
+    <div class="topnav-actions">
+      <button class="icon-btn" id="darkToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <i class="fas fa-moon"></i>
+      </button>
+      <div class="user-pill">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-info">
+          <span class="user-name" id="userDisplayName">Loading…</span>
+          <span class="user-role-badge" id="userRoleBadge">user</span>
+        </div>
+        <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out">
+          <i class="fas fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- PROACTIVE BANNER -->
+  <div class="proactive-banner" id="proactiveBanner" style="display:none;">
+    <i class="fas fa-lightbulb"></i>
+    <span id="proactiveText"></span>
+    <button class="banner-close" id="closeBanner"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toastContainer" class="toast-container" aria-live="assertive"></div>
+
+  <main class="main-content">
+
+    <!-- ─── CHAT VIEW ─── -->
+    <div class="view active" id="view-chat">
+      <div class="chat-layout">
+        <section class="chat-panel">
+          <div class="chat-header">
+            <div class="chat-header-left">
+              <div class="bot-orb" aria-hidden="true">
+                <i class="fas fa-robot"></i><span class="orb-ring"></span>
+              </div>
+              <div>
+                <h2>Smart IT Assistant</h2>
+                <div class="status-line"><span class="status-dot"></span> Online • AI-Powered • v3.0</div>
+              </div>
+            </div>
+            <div class="chat-header-right">
+              <span class="support-hours"><i class="fas fa-clock"></i> 24/7 Support</span>
+              <button class="icon-btn" id="clearChatBtn" title="Clear chat"><i class="fas fa-broom"></i></button>
+            </div>
+          </div>
+          <div class="messages" id="messages" role="log" aria-live="polite" tabindex="0"></div>
+          <div id="suggestContainer" class="suggestions"></div>
+          <div class="composer">
+            <div id="attachPreview" class="attach-preview" style="display:none;"></div>
+            <div class="composer-row">
+              <label class="attach-btn" for="fileInput" title="Attach file" aria-label="Attach file">
+                <i class="fas fa-paperclip"></i>
+                <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.log" style="display:none;">
+              </label>
+              <textarea id="messageInput" placeholder="Describe your issue or ask a question…" rows="1" maxlength="2000"></textarea>
+              <button class="send-btn" id="sendBtn" aria-label="Send message"><i class="fas fa-paper-plane"></i></button>
+            </div>
+            <div class="composer-hint">Enter to send • Shift+Enter for new line • <span id="charCount">0</span>/2000</div>
+          </div>
+        </section>
+
+        <aside class="chat-sidebar">
+          <div class="sidebar-card">
+            <h4><i class="fas fa-bolt"></i> Quick Actions</h4>
+            <button class="sidebar-action" id="sidebarNewTicket"><i class="fas fa-plus"></i> New Ticket</button>
+            <button class="sidebar-action" id="sidebarViewTickets"><i class="fas fa-list"></i> My Tickets</button>
+            <button class="sidebar-action staff-only" id="sidebarKB" style="display:none;"><i class="fas fa-book"></i> Browse KB</button>
+          </div>
+          <div class="sidebar-card">
+            <h4><i class="fas fa-chart-pie"></i> Quick Stats</h4>
+            <div class="stat-row"><span>Open</span><strong id="sSOpen">0</strong></div>
+            <div class="stat-row"><span>Resolved</span><strong id="sSResolved">0</strong></div>
+            <div class="stat-row"><span>KB Articles</span><strong id="sSKB">0</strong></div>
+          </div>
+          <div class="sidebar-card">
+            <h4><i class="fas fa-tags"></i> Common Issues</h4>
+            <div class="category-chips" id="sideCategoryChips"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ─── TICKETS VIEW ─── -->
+    <div class="view" id="view-tickets">
+      <div class="view-header">
+        <h2><i class="fas fa-ticket"></i> <span id="ticketsViewTitle">Support Tickets</span></h2>
+        <div class="view-header-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input id="ticketSearch" type="text" placeholder="Search tickets…">
+          </div>
+          <select id="filterStatus">
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="in-progress">In Progress</option>
+            <option value="waiting">Waiting on User</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <select id="filterCategory" class="staff-only" style="display:none;">
+            <option value="">All Categories</option>
+            <option value="hardware">Hardware</option>
+            <option value="software">Software</option>
+            <option value="network">Network</option>
+            <option value="account">Account</option>
+            <option value="email">Email</option>
+            <option value="security">Security</option>
+            <option value="other">Other</option>
+          </select>
+          <button class="btn" id="newTicketBtn"><i class="fas fa-plus"></i> New Ticket</button>
+          <button class="btn btn-ghost staff-only" id="clearResolvedBtn" style="display:none;"><i class="fas fa-trash"></i> Clear Resolved</button>
+          <button class="btn btn-ghost staff-only" id="exportTicketsBtn" style="display:none;"><i class="fas fa-download"></i> Export CSV</button>
+        </div>
+      </div>
+      <div id="ticketStats" class="ticket-stats-bar"></div>
+      <div class="ticket-table-wrap">
+        <table class="ticket-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Category</th><th>Priority</th>
+              <th>Status</th><th class="staff-only" id="assignedColHeader" style="display:none;">Assigned</th>
+              <th>Created</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ticketTableBody"></tbody>
+        </table>
+        <div id="ticketEmpty" class="empty-state" style="display:none;">
+          <i class="fas fa-inbox"></i><p>No tickets found.</p>
+        </div>
+        <div id="ticketLoading" class="empty-state">
+          <i class="fas fa-circle-notch fa-spin" style="color:var(--accent)"></i><p>Loading tickets…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── DASHBOARD (staff only) ─── -->
+    <div class="view" id="view-dashboard">
+      <div class="view-header">
+        <h2><i class="fas fa-chart-line"></i> Agent Dashboard</h2>
+        <div class="view-header-actions">
+          <span class="small muted" id="dashLastRefresh"></span>
+          <button class="btn btn-ghost" id="refreshDashBtn"><i class="fas fa-rotate"></i> Refresh</button>
+        </div>
+      </div>
+      <div class="dash-kpi-row">
+        <div class="kpi-card"><div class="kpi-icon"><i class="fas fa-ticket"></i></div><div class="kpi-body"><div class="kpi-value" id="kpiTotal">0</div><div class="kpi-label">Total Tickets</div></div></div>
+        <div class="kpi-card kpi-open"><div class="kpi-icon"><i class="fas fa-folder-open"></i></div><div class="kpi-body"><div class="kpi-value" id="kpiOpen">0</div><div class="kpi-label">Open</div></div></div>
+        <div class="kpi-card kpi-progress"><div class="kpi-icon"><i class="fas fa-spinner"></i></div><div class="kpi-body"><div class="kpi-value" id="kpiProgress">0</div><div class="kpi-label">In Progress</div></div></div>
+        <div class="kpi-card kpi-resolved"><div class="kpi-icon"><i class="fas fa-circle-check"></i></div><div class="kpi-body"><div class="kpi-value" id="kpiResolved">0</div><div class="kpi-label">Resolved</div></div></div>
+        <div class="kpi-card kpi-high"><div class="kpi-icon"><i class="fas fa-triangle-exclamation"></i></div><div class="kpi-body"><div class="kpi-value" id="kpiHigh">0</div><div class="kpi-label">High Priority</div></div></div>
+        <div class="kpi-card kpi-kb"><div class="kpi-icon"><i class="fas fa-book"></i></div><div class="kpi-body"><div class="kpi-value" id="kpiKB">0</div><div class="kpi-label">KB Articles</div></div></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card"><h4><i class="fas fa-layer-group"></i> By Category</h4><div id="chartCategory" class="bar-chart"></div></div>
+        <div class="dash-card"><h4><i class="fas fa-fire"></i> By Priority</h4><div id="chartPriority" class="bar-chart"></div></div>
+        <div class="dash-card"><h4><i class="fas fa-clock-rotate-left"></i> Recent Activity</h4><ul id="activityFeed" class="activity-feed"></ul></div>
+        <div class="dash-card">
+          <h4><i class="fas fa-trophy"></i> Resolution Rate</h4>
+          <div class="resolution-ring">
+            <svg viewBox="0 0 120 120" width="120" height="120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="12"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="var(--accent)" stroke-width="12"
+                stroke-dasharray="314" stroke-dashoffset="314" id="resolutionArc"
+                stroke-linecap="round" transform="rotate(-90 60 60)"/>
+            </svg>
+            <div class="ring-label"><span id="resolutionPct">0%</span><small>Resolved</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="dash-card dash-full">
+        <h4><i class="fas fa-triangle-exclamation"></i> Tickets Awaiting Action</h4>
+        <div id="agentQueue" class="agent-queue"></div>
+      </div>
+    </div>
+
+    <!-- ─── KNOWLEDGE BASE (staff only) ─── -->
+    <div class="view" id="view-kb">
+      <div class="view-header">
+        <h2><i class="fas fa-book-open"></i> IT Knowledge Base</h2>
+        <div class="view-header-actions">
+          <div class="search-box"><i class="fas fa-search"></i><input id="kbSearch" type="text" placeholder="Search articles…"></div>
+          <select id="kbFilter">
+            <option value="">All Categories</option>
+            <option value="hardware">Hardware</option><option value="software">Software</option>
+            <option value="network">Network</option><option value="account">Account</option>
+            <option value="email">Email</option><option value="security">Security</option>
+            <option value="other">Other</option>
+          </select>
+          <button class="btn" id="addKbBtn"><i class="fas fa-plus"></i> Add Article</button>
+        </div>
+      </div>
+      <div class="kb-grid" id="kbGrid"></div>
+      <div id="kbEmpty" class="empty-state" style="display:none;"><i class="fas fa-book-open"></i><p>No articles yet.</p></div>
+    </div>
+
+    <!-- ─── USERS (admin only) ─── -->
+    <div class="view" id="view-users">
+      <div class="view-header">
+        <h2><i class="fas fa-users"></i> User Management</h2>
+        <div class="view-header-actions">
+          <div class="search-box"><i class="fas fa-search"></i><input id="userSearch" type="text" placeholder="Search users…"></div>
+        </div>
+      </div>
+      <div class="ticket-table-wrap">
+        <table class="ticket-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Tickets</th><th>Actions</th></tr></thead>
+          <tbody id="usersTableBody"></tbody>
+        </table>
+        <div id="usersEmpty" class="empty-state" style="display:none;"><i class="fas fa-users"></i><p>No users found.</p></div>
+        <div id="usersLoading" class="empty-state"><i class="fas fa-circle-notch fa-spin" style="color:var(--accent)"></i><p>Loading users…</p></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════ MODALS ═══════════ -->
+
+<!-- Ticket Modal -->
+<div class="modal-backdrop" id="ticketModalBackdrop" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-ticket"></i> Create Support Ticket</h3>
+      <button class="modal-close" id="cancelTicketBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-row form-row-full"><label for="ticketTitle">Title <span class="req">*</span></label><input id="ticketTitle" type="text" placeholder="Brief description of the issue" maxlength="120"></div>
+        <div class="form-row"><label for="ticketCategory">Category</label><select id="ticketCategory"><option value="">— Auto-detect —</option><option value="hardware">Hardware</option><option value="software">Software</option><option value="network">Network</option><option value="account">Account</option><option value="email">Email</option><option value="security">Security</option><option value="other">Other</option></select></div>
+        <div class="form-row"><label for="ticketPriority">Priority</label><select id="ticketPriority"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+        <div class="form-row form-row-full"><label for="ticketDesc">Description <span class="req">*</span></label><textarea id="ticketDesc" rows="4" placeholder="Describe the problem in detail…"></textarea></div>
+        <div class="form-row"><label for="ticketEmail">Your Email <span class="req">*</span></label><input id="ticketEmail" type="email" placeholder="yourname@example.com"></div>
+        <div class="form-row staff-only" id="assignedRow" style="display:none;"><label for="ticketAssigned">Assign To</label><select id="ticketAssigned"><option value="unassigned">Unassigned</option><option value="Kelvin (IT Lead)">Kelvin (IT Lead)</option><option value="Agent 1">Agent 1</option><option value="Agent 2">Agent 2</option></select></div>
+
+        <div class="form-row form-row-full remote-support-block">
+          <label><i class="fas fa-desktop"></i> Remote Support (optional)</label>
+          <div class="field-hint" style="margin-bottom:8px;">
+            <i class="fas fa-circle-info"></i> If you'd like an engineer to remotely view your screen,
+            open <strong>RustDesk</strong> or <strong>AnyDesk</strong> on your computer and paste your session ID below.
+            Don't have either installed?
+            <a href="https://rustdesk.com/" target="_blank" rel="noopener">Get RustDesk</a> ·
+            <a href="https://anydesk.com/" target="_blank" rel="noopener">Get AnyDesk</a>
+          </div>
+          <div class="remote-support-row">
+            <select id="ticketRemoteClient" style="max-width:150px;">
+              <option value="">No remote client</option>
+              <option value="RustDesk">RustDesk</option>
+              <option value="AnyDesk">AnyDesk</option>
+            </select>
+            <input id="ticketRemoteId" type="text" placeholder="Your session ID (e.g. 123 456 789)" maxlength="40">
+          </div>
+        </div>
+
+        <div class="form-row form-row-full">
+          <label>Attachments</label>
+          <div class="file-drop-zone" id="modalFileDropZone">
+            <i class="fas fa-cloud-arrow-up"></i>
+            <span>Drop files or <label for="modalFileInput" class="link-label">browse</label></span>
+            <input type="file" id="modalFileInput" multiple accept="image/*,.pdf,.txt,.log" style="display:none;">
+          </div>
+          <div id="modalAttachList" class="attach-list"></div>
+        </div>
+        <div class="form-row form-row-full" id="aiFillRow" style="display:none;">
+          <div class="ai-fill-notice"><i class="fas fa-wand-magic-sparkles"></i><span>AI auto-filled from your conversation.</span><button type="button" class="link-btn" id="clearAiFill">Clear</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelTicketBtn2">Cancel</button>
+      <button class="btn" id="saveTicketBtn"><i class="fas fa-paper-plane"></i> Create Ticket</button>
+    </div>
+  </div>
+</div>
+
+<!-- KB Modal -->
+<div class="modal-backdrop" id="kbModalBackdrop" aria-hidden="true">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-book"></i> <span id="kbModalTitleText">Add KB Article</span></h3>
+      <button class="modal-close" id="cancelKbBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-row form-row-full"><label for="kbTitle">Title <span class="req">*</span></label><input id="kbTitle" type="text" placeholder="E.g., How to reset your password"></div>
+        <div class="form-row"><label for="kbCategory">Category <span class="req">*</span></label><select id="kbCategory"><option value="hardware">Hardware</option><option value="software">Software</option><option value="network">Network</option><option value="account">Account</option><option value="email">Email</option><option value="security">Security</option><option value="other">Other</option></select></div>
+        <div class="form-row"><label for="kbTags">Tags (comma separated)</label><input id="kbTags" type="text" placeholder="password, login, reset"></div>
+        <div class="form-row form-row-full"><label for="kbContent">Content <span class="req">*</span></label><textarea id="kbContent" rows="8" placeholder="Write solution steps here…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelKbBtn2">Cancel</button>
+      <button class="btn" id="saveKbBtn"><i class="fas fa-save"></i> Save Article</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ticket Detail Modal -->
+<div class="modal-backdrop" id="ticketDetailBackdrop" aria-hidden="true">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-info-circle"></i> Ticket Details</h3>
+      <button class="modal-close" id="closeTicketDetail"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="ticketDetailBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" id="closeTicketDetail2">Close</button></div>
+  </div>
+</div>
+
+<!-- Change Role Modal (admin only) -->
+<div class="modal-backdrop" id="changeRoleBackdrop" aria-hidden="true">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header">
+      <h3><i class="fas fa-user-gear"></i> Change User Role</h3>
+      <button class="modal-close" id="closeRoleModal"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p class="role-target-line">Changing role for: <strong id="roleTargetName"></strong></p>
+      <div class="form-row" style="margin-top:14px;">
+        <label for="newRoleSelect">New Role</label>
+        <select id="newRoleSelect">
+          <option value="user">User — IT support requester</option>
+          <option value="engineer">Engineer — IT support agent</option>
+          <option value="admin">Admin — Full access</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelRoleChange">Cancel</button>
+      <button class="btn" id="confirmRoleChange"><i class="fas fa-check"></i> Save Role</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script type="module" src="chatbot.js"></script>
+</body>
+</html>
