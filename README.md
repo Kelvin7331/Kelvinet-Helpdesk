@@ -2,9 +2,9 @@
 
 An AI-powered IT support chatbot and ticketing system built with **vanilla HTML, CSS and JavaScript**, **Firebase** (Auth + Firestore) and a **Cloudflare Worker** that keeps the AI key off the browser. Users describe a problem in chat, get step-by-step help instantly, and escalate to a ticket when the bot can't fix it. Engineers and admins manage everything from a live dashboard.
 
-Built by [Kelvinet Technologies](https://github.com/) — Maua, Meru, Kenya.
+Built by https://kelvinmwichwiri.netlify.app/ — Maua, Meru, Kenya.
 
-> **Live demo:** `https://YOUR-USERNAME.github.io/YOUR-REPO/`
+> **Live demo:** `https://kelvin7331.github.io/Kelvinet-Helpdesk/`
 
 ---
 
