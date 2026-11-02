@@ -11,7 +11,8 @@ Built by [Kelvinet Technologies](https://github.com/) — Maua, Meru, Kenya.
 ## ✨ Features
 
 **For users**
-- 💬 AI support chat with answers formatted as clear numbered steps and bullet lists
+- 💬 AI support chat grounded in the company Knowledge Base, with numbered steps and a "Based on" source line
+- 👍👎 Rate every answer; your feedback improves the knowledge base
 - 🎫 One-click ticket creation — the AI pre-fills the title, description, category and priority from your conversation
 - 🖼️ Attach screenshots in chat and files to tickets
 - 🖥️ Optional remote-support request: share your **RustDesk** or **AnyDesk** session ID on a ticket
@@ -23,7 +24,10 @@ Built by [Kelvinet Technologies](https://github.com/) — Maua, Meru, Kenya.
 - 📊 Live dashboard: KPIs, tickets by category and priority, resolution rate, activity feed, prioritised action queue
 - 🎟️ All tickets in real time, with search, filters, status workflow (Open → In Progress → Waiting → Resolved), notes and CSV export
 - 📚 Knowledge Base builder (add, edit, delete, search)
-- ⚡ **Resolved tickets automatically become KB articles** (AI-written, tagged "Auto" for review)
+- ✅ **Resolve Ticket** workflow: engineers record the root cause and the fix, and the user sees how it was resolved
+- ⚡ Resolved tickets become **draft** KB articles (AI-written, redacted, reviewed by a human before the bot uses them)
+- 🧠 **Learning loop** dashboard: unanswered questions, article quality, helpful rate
+- 📚 25 professionally written starter articles in one consistent format, loaded with one click
 - 👥 Admin-only user management and role changes
 - 🏷️ Sequential ticket IDs: `T_KT001`, `T_KT002`, …
 
@@ -42,7 +46,10 @@ Built by [Kelvinet Technologies](https://github.com/) — Maua, Meru, Kenya.
 | View **all** tickets | ❌ | ✅ | ✅ |
 | Change ticket status / add notes | ❌ | ✅ | ✅ |
 | Dashboard & CSV export | ❌ | ✅ | ✅ |
-| Create / edit Knowledge Base articles | ❌ | ✅ | ✅ |
+| Resolve tickets (record the fix) | ❌ | ✅ | ✅ |
+| Create / edit / approve Knowledge Base articles | ❌ | ✅ | ✅ |
+| Load starter articles | ❌ | ❌ | ✅ |
+| Rate chatbot answers (👍 / 👎) | ✅ | ✅ | ✅ |
 | Delete tickets | ❌ | ❌ | ✅ |
 | Manage users & roles | ❌ | ❌ | ✅ |
 
@@ -60,7 +67,7 @@ flowchart LR
     B -->|ticket confirmation| E[EmailJS]
 ```
 
-The browser never sees the AI key. The Worker accepts a request only if it carries a valid Firebase login token for **your** project.
+The browser never sees the AI key. Users only ever receive **approved** Knowledge Base articles. The Worker accepts a request only if it carries a valid Firebase login token for **your** project.
 
 ---
 
@@ -80,14 +87,63 @@ The browser never sees the AI key. The Worker accepts a request only if it carri
 ## 📁 Project structure
 
 ```
-├── index.html              # App shell: auth screen, chat, tickets, dashboard, KB
+├── index.html              # App shell: auth, chat, tickets, dashboard, Knowledge Base
 ├── chatbot.css             # Styles (dark/light themes, responsive)
-├── chatbot.js              # All app logic
-├── firestore.rules         # Firestore security rules (publish in Firebase console)
+├── logo.png                # Platform logo:
+├── chatbot.js              # App logic: auth, tickets, chat, feedback, resolve flow
+├── kb-engine.js            # Pure retrieval / scoring / redaction / gap-grouping logic
+├── kb-seed.js              # 25 professional starter articles
+├── firestore.rules         # Firestore security rules (publish in the Firebase console)
 ├── worker/
 │   └── cloudflare-worker.js  # AI proxy (paste into a Cloudflare Worker)
 └── README.md
 ```
+
+`kb-engine.js` has no browser or Firebase dependencies, so it can be unit-tested in Node.
+
+**Branding:** if `logo.png` is present it replaces the robot icon in the chat header, bot messages and typing indicator, and becomes the browser-tab icon. If it is missing the robot icon is used. Change `LOGO_URL` in the `CONFIG` block of `chatbot.js` to use a different file name.
+
+---
+
+## 🧠 How the assistant keeps learning
+
+The assistant does not retrain a model. It **learns by growing its knowledge**, which is safer, cheaper and fully auditable. The Knowledge Base is the memory; Gemini (or Claude) is the reader.
+
+```mermaid
+flowchart LR
+    Q[User asks a question] --> R[Retrieve best approved articles]
+    R --> A[AI answers using those articles]
+    A --> F{👍 or 👎}
+    F -->|👍| S[Article score goes up]
+    F -->|👎 or no match| G[Knowledge gap logged]
+    G --> T[Ticket raised]
+    T --> X[Engineer resolves it]
+    X --> D[Draft article written]
+    D --> H{Engineer reviews}
+    H -->|Approve| R
+```
+
+1. **Retrieve before answering.** Each question is matched against *approved* articles (stemming, synonyms, title and tag weighting, plus a boost or penalty from past votes). The best three go to the AI with the instruction to rely on them and not to invent company-specific steps. If nothing matches, the AI is told so and offers a ticket. Short follow-ups such as "still not working" reuse the previous answer's articles.
+2. **Feedback.** 👍 / 👎 under every answer. Votes are stored on the articles that grounded the answer.
+3. **Human in the loop.** AI-written articles start as **Draft** and are invisible to users (enforced by Firestore rules). Only an engineer's **Approve** makes one live.
+4. **Article scoring.** Articles with at least 3 votes and under 50% helpful are flagged on the dashboard.
+5. **Knowledge gaps.** Questions with no matching article, 👎 answers, and questions that ended in a ticket are grouped on the dashboard. **Write article** opens the editor with the question and a standard template; saving closes the gap.
+
+All logs are redacted (emails, phone numbers, long numbers, `password is …`) before they are stored.
+
+## 🛠️ How an engineer resolves a ticket
+
+1. Open **Tickets** (or the dashboard queue). Every ticket row has a **View Ticket** button; staff also see **Resolve Ticket**.
+2. **View Ticket** shows the details, any RustDesk/AnyDesk session ID (with a Copy button) and internal notes. **Assign to me & start** takes the ticket and sets it to *In Progress*. Use *Waiting on User* when you need information.
+3. Work the problem. The **Knowledge Base** tab has the standard fix for common issues.
+4. Click **Resolve Ticket**. A dialog asks for:
+   - **What fixed it?** (required, at least 15 characters). The user sees this text.
+   - **Root cause** (optional, staff only).
+   - **Create a draft Knowledge Base article** (ticked by default).
+5. The ticket becomes *Resolved*, recording who resolved it and when. If you ticked the box, a **draft** article is written with personal data removed.
+6. Open **Knowledge Base → Review now**, check the draft, edit it if needed and **Approve**. From then on the chatbot can use it, and any matching knowledge gap closes automatically.
+
+A resolved ticket can be reopened from its detail view. Users can view only their own tickets; they cannot change a ticket's status or resolution.
 
 ---
 
@@ -99,7 +155,7 @@ The browser never sees the AI key. The Worker accepts a request only if it carri
 2. **Authentication → Sign-in method →** enable **Email/Password**.
 3. **Authentication → Settings → Authorized domains →** add `YOUR-USERNAME.github.io`.
 4. **Firestore Database → Create database** (production mode).
-5. **Firestore → Rules →** paste the contents of `firestore.rules` and **Publish**.
+5. **Firestore → Rules →** paste the contents of `firestore.rules` and **Publish**. Republish whenever this file changes: it also protects the `kb`, `feedback` and `gaps` collections.
 6. **Project settings → Your apps → Web app (`</>`)** → copy the `firebaseConfig` into `chatbot.js`.
 
 ### 2. AI proxy (Cloudflare Worker)
@@ -137,6 +193,7 @@ Users' "My Tickets" view needs a composite index. The first time it loads, open 
 1. Open the site and **Create Account**.
 2. In the Firebase console go to **Firestore → `users` →** your document and change `role` to `admin`.
 3. Sign out and back in. From the **Users** tab you can now promote others to Engineer or Admin.
+4. Open **Knowledge Base → Load Starter Articles** (admin only). This adds the 25 professional articles, replaces the older thin starter articles, and marks any older articles with the correct review status. It is safe to run again.
 
 ### 6. Deploy to GitHub Pages
 
@@ -150,6 +207,7 @@ Users' "My Tickets" view needs a composite index. The first time it loads, open 
 - **The AI key is a real secret** and lives only in Cloudflare as an encrypted Worker secret. Never commit it.
 - The Worker verifies each caller's Firebase ID token (signature, issuer, audience, expiry) before spending any AI credit, and caps message count and response length.
 - **Privacy:** on Google's free Gemini tier, prompts may be used to improve Google's products. Tell users not to paste passwords or confidential data into the chat, or move to a paid key if that matters for your organisation.
+- **Unreviewed AI drafts never reach users.** Firestore rules let users read only `status == "approved"` articles, and the only thing a user can write to an article is `+1` on its helpful / unhelpful counter. Staff can reset votes if they are abused.
 - Roles can't be self-assigned: Firestore rules only allow new profiles with `role: "user"`.
 - EmailJS public keys are also designed to be public; use EmailJS's domain allow-list to restrict them.
 
@@ -169,6 +227,8 @@ The "AI unavailable" banner now states the reason:
 | `Gemini 429 …` `[HTTP 502]` | Free-tier rate limit reached. Wait a minute, or enable billing in AI Studio for higher limits. |
 | `Gemini 400/403 …` `[HTTP 502]` | `GEMINI_API_KEY` is wrong or from a different Google product. Create a fresh key in AI Studio. |
 | `AI provider rejected the request (Anthropic …)` | Invalid Claude key or no account credit. Check the Worker's **Logs**. |
+| The chatbot never uses my articles | Only **Approved** articles are used. Open the article and click **Approve**. Older articles with no status are migrated when an admin clicks **Load Starter Articles**. |
+| Users see `permission-denied` for the Knowledge Base | Republish `firestore.rules`. |
 
 Other common issues: users seeing an empty "My Tickets" list usually means the Firestore index in step 4 is missing; password-reset emails need your domain in Firebase's authorized domains.
 
@@ -176,6 +236,7 @@ Other common issues: users seeing an empty "My Tickets" list usually means the F
 
 ## 🗺️ Roadmap
 
+- Semantic search with Gemini embeddings (once there are hundreds of approved articles)
 - Persistent file storage for ticket attachments (currently filenames are recorded)
 - SLA timers and escalation
 - Satisfaction rating after resolution
