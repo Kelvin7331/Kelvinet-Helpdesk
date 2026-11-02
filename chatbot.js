@@ -26,14 +26,22 @@
 const CONFIG = {
   // Claude API key is no longer stored here — it lives server-side in
   // Firebase Cloud Functions (Secret Manager). See functions/index.js.
-  EMAILJS_SERVICE_ID:  'YOUR_SERVICE_ID',
-  EMAILJS_TEMPLATE_ID: 'YOUR_TEMPLATE_ID',
-  EMAILJS_PUBLIC_KEY:  'YOUR_PUBLIC_KEY',
+  EMAILJS_SERVICE_ID:  'service_5ajsa5e',
+  EMAILJS_TEMPLATE_ID: 'template_83iqk19',
+  EMAILJS_PUBLIC_KEY:  '6oZmlbZJrM4eKcjS6',
   MAX_MESSAGES:    150,
   MAX_FILE_SIZE_MB: 5,
   TYPING_DELAY_MS: 600,
   COMPANY_NAME:    'Kelvinet Technologies',
   SUPPORT_EMAIL:   'support@kelvinet.co.ke',
+  // Your logo. Put the file next to index.html (names are case-sensitive on GitHub Pages).
+  // If it loads, it replaces the robot icon and becomes the browser-tab icon.
+  // Set to '' to always use the robot icon.
+  LOGO_URL:        'logo.png',
+  // Facts the assistant may share when users ask who built it or what the company does.
+  DEVELOPER_NAME:  'Kelvin Mwichwiri Gitonga',
+  DEVELOPER_ROLE:  'founder and lead developer of Kelvinet Technologies',
+  COMPANY_SERVICES:'web development, networking, cybersecurity, IT support, digital marketing and IT consultancy',
 };
 
 /* ═══════════════════════════════════════════════
@@ -52,8 +60,13 @@ import {
   getFirestore, collection, doc, getDoc, getDocs,
   setDoc, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, limit,
-  onSnapshot, serverTimestamp, runTransaction,
+  onSnapshot, serverTimestamp, runTransaction, increment, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { STARTER_KB, STARTER_KB_VERSION, LEGACY_STARTER_TITLES } from './kb-seed.js';
+import {
+  tokenize, topRelevant, buildKBContext, isSmallTalk, redactSensitive,
+  normalizeQuestion, groupGaps, articleHealth, effectiveStatus, articlePreview,
+} from './kb-engine.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBlWdrPTp4N3MyWOB3RKr73gbMneRwUQhI",
@@ -69,137 +82,52 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 /* ═══════════════════════════════════════════════
-   🤖  AI PROXY — plain HTTPS Cloud Function
-   Deployed via Google Cloud Console (no Firebase CLI).
-   See console-function-index.js for the server-side code.
+   🤖  AI PROXY — Cloudflare Worker
+   The AI key lives in the Worker (server side), never in this file.
+   See worker/cloudflare-worker.js and the README.
 ═══════════════════════════════════════════════ */
 
-// Paste your function's Trigger URL here (Cloud Functions Console →
-// your function → Trigger tab → Trigger URL).
+// Paste your Worker URL here (Cloudflare → Workers & Pages → your worker).
+// Must be the bare URL, e.g. https://kelvinet-ai-proxy.yourname.workers.dev
 const AI_PROXY_URL = 'https://kelvinet-ai-proxy.kelvinmwichwiri1.workers.dev';
 
 /**
- * Drop-in replacement for the Firebase callable SDK's httpsCallable().
- * Same call shape as before — askClaude({ system, messages, max_tokens }) —
- * so none of the call sites elsewhere in this file need to change.
- * Internally: fetches a fresh Firebase ID token and sends it as a Bearer
- * header, since this is a plain HTTPS function doing its own token check
- * (not a Firebase "callable" function, which the CLI-based setup used).
+ * Calls the Worker with the signed-in user's Firebase ID token.
+ * Returns { data: { text } }. Throws an Error whose message explains
+ * exactly what went wrong (shown in the "AI unavailable" toast).
  */
 async function askClaude(payload) {
+  if (!AI_PROXY_URL || AI_PROXY_URL.includes('YOUR_')) {
+    throw new Error('AI_PROXY_URL is not set in chatbot.js');
+  }
   if (!auth.currentUser) {
-    throw new Error('Not signed in — cannot call AI proxy.');
+    throw new Error('you are not signed in');
   }
   const idToken = await auth.currentUser.getIdToken();
 
-  const res = await fetch(AI_PROXY_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (netErr) {
+    // fetch() only throws on network failure or a CORS block
+    throw new Error('cannot reach the AI proxy (wrong Worker URL, or ALLOWED_ORIGINS does not include this site)');
+  }
 
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `AI proxy HTTP ${res.status}`);
+    throw new Error(`${errBody.error || 'proxy error'} [HTTP ${res.status}]`);
   }
 
   const data = await res.json();
-  // Wrapped in { data: ... } to match the shape the rest of the file expects
-  // from result.data.text (the same shape httpsCallable() returns).
   return { data };
 }
-
-/* ═══════════════════════════════════════════════
-   📚  SEED KB ARTICLES  (auto-loaded on first run)
-═══════════════════════════════════════════════ */
-const SEED_KB = [
-  {
-    title: 'Cannot login / forgot password', category: 'account',
-    tags: ['password','login','reset','forgot','locked'],
-    content: `Your account may be locked or the password has been forgotten. Here are the steps:
-1. Go to the login page and click "Forgot Password".
-2. Enter your registered email address.
-3. Check your inbox (and spam folder) for the reset link.
-4. Click the link and set a new password.
-5. If still locked, contact support@kelvinet.co.ke with your employee ID.`,
-  },
-  {
-    title: 'Printer not printing', category: 'hardware',
-    tags: ['printer','print','paper jam','toner'],
-    content: `Your printer may be offline, out of supplies, or have a stuck print job. Try these steps:
-1. Confirm the printer is powered ON and has paper and toner.
-2. Set it as the default printer on your PC.
-3. On Windows: open services.msc → find "Print Spooler" → click Restart.
-4. For network printers: verify it is on the same network subnet.
-5. Print a test page directly from the printer to confirm hardware is OK.`,
-  },
-  {
-    title: 'WiFi or Internet not working', category: 'network',
-    tags: ['wifi','internet','network','router','connection'],
-    content: `Your internet connection may be disrupted. Try these steps:
-1. Restart your router and modem — wait 30 seconds before reconnecting.
-2. Check if other devices are also affected to isolate the problem.
-3. On Windows: open Command Prompt and run "ipconfig /release" then "ipconfig /renew".
-4. Forget and re-join the WiFi network on your device.
-5. If only your device is affected, update the network adapter driver.`,
-  },
-  {
-    title: 'Computer running slowly', category: 'hardware',
-    tags: ['slow','lag','freeze','performance','hanging'],
-    content: `A slow computer is usually caused by high resource usage or a full disk. Try:
-1. Open Task Manager (Ctrl+Shift+Esc) and check which process is consuming most CPU/RAM.
-2. Close unused applications and browser tabs.
-3. Run Disk Cleanup to free disk space.
-4. Check if disk usage is stuck at 100% — this suggests a failing drive or full storage.
-5. Restart the computer to clear memory.
-6. If still slow, the device may need a RAM upgrade or SSD replacement.`,
-  },
-  {
-    title: 'Email not working in Outlook', category: 'email',
-    tags: ['email','outlook','send','receive','smtp','imap'],
-    content: `Outlook may have lost its server connection or have incorrect settings. Try:
-1. Check your internet connection first.
-2. In Outlook: go to File → Account Settings → Test Account Settings.
-3. Verify SMTP and IMAP server details with your IT admin.
-4. For corporate accounts: confirm VPN is connected if required.
-5. Check the Outbox for stuck messages and delete or resend them.
-6. For Gmail in Outlook: ensure an App Password is configured in your Google account.`,
-  },
-  {
-    title: 'Software installation guide', category: 'software',
-    tags: ['install','update','software','setup','driver'],
-    content: `Follow these steps to safely install approved software:
-1. Only install software approved by the IT department.
-2. Right-click the installer and select "Run as Administrator".
-3. Standard Windows installers use .exe or .msi formats.
-4. If antivirus blocks a legitimate installer: temporarily disable it, install, then re-enable immediately.
-5. For failed Windows Updates: delete the contents of C:\\Windows\\SoftwareDistribution\\Download and retry.`,
-  },
-  {
-    title: 'VPN connection issues', category: 'network',
-    tags: ['vpn','remote','tunnel','connect'],
-    content: `VPN issues are usually caused by expired credentials or conflicting software. Try:
-1. Ensure you have a stable internet connection before launching VPN.
-2. Verify your VPN username and password — corporate passwords expire periodically.
-3. Try connecting to a different VPN server if options are available.
-4. Disable other VPN clients or conflicting network adapters.
-5. Open Command Prompt and run "ipconfig /flushdns".
-6. Uninstall and reinstall the VPN client if the problem persists.`,
-  },
-  {
-    title: 'Screen or monitor not displaying', category: 'hardware',
-    tags: ['monitor','screen','display','black screen','hdmi','vga'],
-    content: `A blank screen is usually a cable, power, or display mode issue. Try:
-1. Check all cables (HDMI, VGA, DisplayPort) at both the monitor and PC.
-2. Try a different cable if available.
-3. Press Win+P to toggle display mode (Duplicate, Extend, Second Screen Only).
-4. Check the monitor power indicator light — if off, check the power cable and socket.
-5. Test the monitor with a different device to determine whether it is the monitor or the PC at fault.`,
-  },
-];
 
 /* ═══════════════════════════════════════════════
    🧠  APP STATE
@@ -220,6 +148,16 @@ let editingKBId      = null;
 let roleTargetUid    = null;
 let isResponding     = false;
 const conversationHistory = [];
+
+// ── Learning-loop state ──
+let kbCache         = [];          // KB docs visible to this user (staff: all, user: approved only)
+let kbListener      = null;        // Firestore unsubscribe for the KB listener
+let appEventsBound  = false;       // bindAppEvents() must only run once per page load
+let loggedGapKeys   = new Set();   // de-duplicates gap logging within a session
+let pendingGapIds   = [];          // gaps to close when an engineer saves an article written from a gap
+let resolvingTicket = null;        // { firestoreId, data } while the Resolve modal is open
+let gapGroups       = [];          // last grouped gaps shown on the dashboard
+let lastRetrieval   = [];          // articles that answered the last substantive question (reused for short follow-ups)
 
 /* ═══════════════════════════════════════════════
    🔧  UTILITIES
@@ -319,7 +257,7 @@ async function handleSignup() {
   const name  = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim();
   const pw    = document.getElementById('signupPassword').value;
-  let   role  = document.getElementById('signupRole').value;
+  const role  = 'user';   // roles are never self-assigned; an admin promotes accounts in the Users tab
   clearAuthError('signup');
   if (!name)        { showAuthError('signup','Full name is required.'); return; }
   if (!email)       { showAuthError('signup','Email address is required.'); return; }
@@ -327,31 +265,11 @@ async function handleSignup() {
   const btn = document.getElementById('signupBtn');
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Creating account…';
   try {
-    // ── First-run bootstrap: if no users exist yet, this account becomes admin ──
-    // Uses a transaction on meta/bootstrap so two simultaneous signups can't both win.
-    let becameFirstAdmin = false;
-    try {
-      const bootstrapRef = doc(db, 'meta', 'bootstrap');
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(bootstrapRef);
-        if (!snap.exists() || !snap.data().adminCreated) {
-          tx.set(bootstrapRef, { adminCreated: true, at: serverTimestamp() }, { merge: true });
-          becameFirstAdmin = true;
-        }
-      });
-    } catch (e) {
-      console.warn('[Bootstrap] Could not check first-run state:', e);
-    }
-    if (becameFirstAdmin) role = 'admin';
-
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await setDoc(doc(db, 'users', cred.user.uid), {
       name, email, role, uid: cred.user.uid,
       createdAt: serverTimestamp(),
     });
-    if (becameFirstAdmin) {
-      showToast('You are the first account — automatically made Admin!', 'success', 6000);
-    }
     // onAuthStateChanged auto-logs them in
   } catch(e) {
     const msgs = {
@@ -367,7 +285,11 @@ async function handleSignup() {
 
 async function handleSignOut() {
   if (ticketListener) { ticketListener(); ticketListener = null; }
+  if (kbListener) { kbListener(); kbListener = null; }
   localMessages = [];
+  kbCache = []; pendingGapIds = []; gapGroups = []; resolvingTicket = null; lastRetrieval = [];
+  conversationHistory.length = 0;   // never carry one person's chat into the next session
+  loggedGapKeys.clear(); chatAttachments = [];
   currentUser = null; currentProfile = null;
   await signOut(auth);
   document.getElementById('appShell').style.display = 'none';
@@ -457,17 +379,72 @@ async function nextTicketId() {
 }
 
 /* ═══════════════════════════════════════════════
-   🔥  FIRESTORE — SEED KB ON FIRST ADMIN/ENGINEER LOGIN
+   📚  KNOWLEDGE BASE — LIVE CACHE + STARTER IMPORT
+   Staff receive every article (incl. drafts); users only ever
+   receive APPROVED ones, so unreviewed AI drafts never reach them.
 ═══════════════════════════════════════════════ */
+const kbApproved = () => kbCache.filter(a => effectiveStatus(a) === 'approved');
+
+function updateKBCounts() {
+  const el = document.getElementById('sSKB'); if (el) el.textContent = kbApproved().length;
+  renderCategoryChips(kbApproved());
+}
+
+function setupKBListener() {
+  if (kbListener) { kbListener(); kbListener = null; }
+  const src = isStaff()
+    ? collection(db, 'kb')
+    : query(collection(db, 'kb'), where('status', '==', 'approved'));
+  kbListener = onSnapshot(src, snap => {
+    kbCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    updateKBCounts();
+    if (document.getElementById('view-kb')?.classList.contains('active')) renderKB();
+    if (isStaff() && document.getElementById('view-dashboard')?.classList.contains('active')) renderLearningPanel();
+  }, err => {
+    console.error('[KB]', err);
+    showToast('Could not load the Knowledge Base. Check Firestore rules.', 'error');
+  });
+}
+
 async function seedKBIfEmpty() {
   if (!isStaff()) return;
-  const snap = await getDocs(query(collection(db,'kb'), limit(1)));
-  if (!snap.empty) return;
-  for (const article of SEED_KB) {
-    await addDoc(collection(db, 'kb'), {
-      ...article, ts: serverTimestamp(), views: 0, createdBy: currentUser.uid,
-    });
+  try {
+    const snap = await getDocs(query(collection(db, 'kb'), limit(1)));
+    if (snap.empty) await importStarterArticles({ silent: true });
+  } catch (e) { console.warn('[KB seed]', e); }
+}
+
+/** Adds the professional starter articles (idempotent via seedKey) and tidies legacy docs. */
+async function importStarterArticles({ silent = false } = {}) {
+  if (!isStaff()) return;
+  const snap     = await getDocs(collection(db, 'kb'));
+  const existing = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const haveKeys = new Set(existing.map(a => a.seedKey).filter(Boolean));
+  const toAdd    = STARTER_KB.filter(a => !haveKeys.has(a.seedKey));
+  const legacy   = existing.filter(a => !a.seedKey && !a.autoGenerated &&
+                     LEGACY_STARTER_TITLES.includes(String(a.title || '').trim().toLowerCase()));
+  const needStatus = existing.filter(a => !a.status && !legacy.includes(a));
+
+  if (!toAdd.length && !legacy.length && !needStatus.length) {
+    if (!silent) showToast('Starter articles are already up to date.', 'info');
+    return;
   }
+  if (!silent) {
+    const msg = `Add ${toAdd.length} professional article(s)` +
+      (legacy.length ? ` and replace ${legacy.length} older starter article(s) with the same topics` : '') + '?';
+    if (!confirm(msg)) return;
+  }
+
+  const batch = writeBatch(db);
+  toAdd.forEach(a => batch.set(doc(collection(db, 'kb')), {
+    ...a, status: 'approved', helpful: 0, unhelpful: 0, views: 0,
+    seedVersion: STARTER_KB_VERSION, ts: serverTimestamp(), createdBy: currentUser.uid,
+  }));
+  legacy.forEach(a => batch.delete(doc(db, 'kb', a.id)));
+  needStatus.forEach(a => batch.update(doc(db, 'kb', a.id), { status: a.autoGenerated ? 'draft' : 'approved' }));
+  await batch.commit();
+  await logActivity(`Starter Knowledge Base loaded (${toAdd.length} added, ${legacy.length} replaced)`);
+  if (!silent) showToast(`Knowledge Base updated: ${toAdd.length} added, ${legacy.length} replaced.`, 'success', 6000);
 }
 
 /* ═══════════════════════════════════════════════
@@ -494,11 +471,18 @@ const SYSTEM_PROMPT = `You are "Kelvinet IT Assistant", the AI-powered IT helpde
 
 Your role:
 - Provide clear, accurate, friendly IT support answers.
-- Only answer IT-related questions; politely redirect anything else.
+- Only answer IT-related questions, plus questions about this assistant, the company and its developer (see ABOUT below). Politely redirect anything else.
 - If the issue cannot be resolved remotely, suggest creating a support ticket.
 - When recommending a ticket, end your message with: [SUGGEST_TICKET]
 - When you can categorize the issue, append: [CATEGORY:hardware|software|network|account|email|security|other]
 - When you can suggest a priority, append: [PRIORITY:low|normal|high|critical]
+
+ABOUT THIS ASSISTANT (use this when asked who built you, who the developer is, or what the company does):
+- You were designed and built by ${CONFIG.DEVELOPER_NAME}, ${CONFIG.DEVELOPER_ROLE}, based in Maua, Meru, Kenya.
+- ${CONFIG.COMPANY_NAME} offers ${CONFIG.COMPANY_SERVICES}.
+- To contact the company, users can email ${CONFIG.SUPPORT_EMAIL} or raise a ticket in this app.
+- You are an AI assistant, never a human. If asked which AI model you run on, say it is a third-party language model; do not claim Kelvinet trained it.
+- Share only this professional information. Never guess or invent personal details (phone numbers, addresses, family, finances), credentials, awards or links.
 
 FORMATTING RULES — follow strictly every time:
 1. NEVER write a large paragraph. Break all responses into short, scannable lines.
@@ -515,22 +499,54 @@ Example of correct format:
 3. Right-click → See what's printing → Cancel all jobs.
 4. Print a test page."
 
+Never ask the user to share passwords, MFA codes or card numbers, and warn them not to if they offer.
+
 Always be professional, empathetic, and solution-focused.`;
 
+/**
+ * Finds approved articles for a question. Short follow-ups such as
+ * "it still doesn't work" reuse the articles from the previous answer.
+ */
+function retrieveFor(userText) {
+  const own = topRelevant(userText, kbApproved(), 3);
+  if (own.length) { lastRetrieval = own; return own; }
+  if (tokenize(userText).length >= 3) { lastRetrieval = []; return []; }   // a real new question we cannot answer
+  // A short follow-up ("it still fails") that matches nothing by itself keeps working
+  // with the articles that answered the previous question.
+  return lastRetrieval;
+}
+
+/** Attaches the feedback context + sources, and logs a knowledge gap when nothing matched. */
+function finalizeReply(userText, reply, results) {
+  const smallTalk = isSmallTalk(userText);
+  const matched   = results.length > 0;
+  reply.sources     = results.map(r => r.article.title);
+  reply.feedbackCtx = smallTalk ? null : {
+    question: userText, answer: reply.text,
+    articleIds: results.map(r => r.article.id).filter(Boolean), matched,
+  };
+  if (!matched && !smallTalk && tokenize(userText).length >= 2) logGap(userText, 'no_match');
+  return reply;
+}
+
 async function getAIReply(userText, attachmentInfo = '') {
+  const results = retrieveFor(userText);                    // must run BEFORE the new turn is pushed
+  const system  = SYSTEM_PROMPT + '\n\n' + buildKBContext(results);
   const content = attachmentInfo ? `${userText}\n\n[User has attached: ${attachmentInfo}]` : userText;
   conversationHistory.push({ role: 'user', content });
-  const recent = conversationHistory.slice(-10);
+  let recent = conversationHistory.slice(-10);
+  while (recent.length && recent[0].role !== 'user') recent.shift();   // window must start with a user turn
   try {
-    const result = await askClaude({ system: SYSTEM_PROMPT, messages: recent, max_tokens: 512 });
+    const result = await askClaude({ system, messages: recent, max_tokens: 700 });
     const text = result.data?.text || '';
     if (!text) throw new Error('Empty response from AI proxy');
     conversationHistory.push({ role: 'assistant', content: text });
-    return parseAIResponse(text);
+    return finalizeReply(userText, parseAIResponse(text), results);
   } catch(e) {
     console.error('[AI]', e);
-    showToast('AI unavailable — using offline mode.', 'warning', 3000);
-    return getFallbackReply(userText);
+    conversationHistory.pop();   // drop the failed turn so history stays valid
+    showToast(`AI unavailable: ${e.message} — using offline mode.`, 'warning', 9000);
+    return finalizeReply(userText, getFallbackReply(userText, results), results);
   }
 }
 
@@ -544,19 +560,20 @@ function parseAIResponse(raw) {
   return r;
 }
 
-function getFallbackReply(userText) {
-  const t = (userText || '').toLowerCase();
-  if (!t.trim()) return { text: "Could you describe the issue in more detail?", suggestTicket: false };
-  // Check KB first
-  for (const a of SEED_KB) {
-    if ((a.tags || []).some(tag => t.includes(tag))) {
-      return { text: a.content, suggestTicket: false, category: a.category };
-    }
+function getFallbackReply(userText, results = []) {
+  const t = (userText || '').toLowerCase().trim();
+  if (!t) return { text: 'Could you describe the issue in more detail?', suggestTicket: false };
+  if (/^(hi|hello|hey|good (morning|afternoon|evening))\b/.test(t)) return { text: `Hi! I'm the Kelvinet IT Assistant. How can I help you today?` };
+  if (/^(thanks?|thank you)\b/.test(t))  return { text: "You're welcome! Happy to help. 😊" };
+  if (/^(bye|goodbye)\b/.test(t))        return { text: 'Goodbye! Have a productive day. 👋' };
+  if (/\b(who|which company)\b.*\b(made|built|created|developed|designed|programmed|owns)\b.*\byou\b|\b(your|the)\s+(developer|creator|maker)\b|\bwho is kelvin\b/.test(t))
+    return { text: `I was designed and built by ${CONFIG.DEVELOPER_NAME}, ${CONFIG.DEVELOPER_ROLE}, in Maua, Meru, Kenya. You can reach the team at ${CONFIG.SUPPORT_EMAIL}.` };
+  if (/\b(about|what does|who is)\b.*\bkelvinet\b/.test(t))
+    return { text: `${CONFIG.COMPANY_NAME} offers ${CONFIG.COMPANY_SERVICES}. You can reach the team at ${CONFIG.SUPPORT_EMAIL}.` };
+  if (results.length) {
+    const a = results[0].article;
+    return { text: `I'm in offline mode, but our guide on **${a.title}** should help:\n\n${a.content}`, suggestTicket: false, category: a.category };
   }
-  if (/hello|hi|hey|morning|afternoon/.test(t)) return { text: `Hi! I'm the Kelvinet IT Assistant. How can I help you today?` };
-  if (/thank|thanks/.test(t))                   return { text: "You're welcome! Happy to help. 😊" };
-  if (/bye|goodbye/.test(t))                    return { text: "Goodbye! Have a productive day. 👋" };
-  if (/who (made|built|created) you/.test(t))   return { text: `I was built by ${CONFIG.COMPANY_NAME}, developed by Kelvin Mwichwiri.` };
   return { text: "I couldn't find a specific solution for that. Would you like me to create a support ticket so our IT team can assist you directly?", suggestTicket: true, category: 'other' };
 }
 
@@ -623,26 +640,35 @@ async function sendTicketEmail(ticket) {
 /* ═══════════════════════════════════════════════
    💬  CHAT — MESSAGE RENDERING
 ═══════════════════════════════════════════════ */
+/** Escapes first, then applies a safe subset of inline markdown. */
+function inlineFmt(str) {
+  return escapeHtml(str)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
 function formatMessageText(raw) {
   if (!raw) return '';
-  const lines = raw.split('\n');
+  const lines = String(raw).split('\n');
   let html = '', inOL = false, inUL = false;
   const closeOL = () => { if (inOL) { html += '</ol>'; inOL = false; } };
   const closeUL = () => { if (inUL) { html += '</ul>'; inUL = false; } };
   lines.forEach(line => {
     const tr = line.trim();
     if (!tr) { closeOL(); closeUL(); return; }
+    const hm = tr.match(/^#{1,4}\s+(.+)/);
+    if (hm) { closeOL(); closeUL(); html += `<h5 class="msg-h">${inlineFmt(hm[1])}</h5>`; return; }
     const nm = tr.match(/^(\d+)\.\s+(.+)/);
-    if (nm) { closeUL(); if (!inOL) { html += '<ol>'; inOL = true; } html += `<li>${escapeHtml(nm[2])}</li>`; return; }
+    if (nm) { closeUL(); if (!inOL) { html += '<ol>'; inOL = true; } html += `<li>${inlineFmt(nm[2])}</li>`; return; }
     const bm = tr.match(/^[-•*–]\s+(.+)/);
-    if (bm) { closeOL(); if (!inUL) { html += '<ul>'; inUL = true; } html += `<li>${escapeHtml(bm[1])}</li>`; return; }
-    closeOL(); closeUL(); html += `<p>${escapeHtml(tr)}</p>`;
+    if (bm) { closeOL(); if (!inUL) { html += '<ul>'; inUL = true; } html += `<li>${inlineFmt(bm[1])}</li>`; return; }
+    closeOL(); closeUL(); html += `<p>${inlineFmt(tr)}</p>`;
   });
   closeOL(); closeUL();
   return html;
 }
 
-function appendMessage({ from = 'bot', text = '', save = true, imageDataUrl = null }) {
+function appendMessage({ from = 'bot', text = '', save = true, imageDataUrl = null, feedback = null, sources = null }) {
   const el  = document.createElement('div'); el.className = `msg-row ${from}`;
   const av  = document.createElement('div'); av.className = 'msg-avatar'; av.setAttribute('aria-hidden','true');
   av.innerHTML = from === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
@@ -652,14 +678,73 @@ function appendMessage({ from = 'bot', text = '', save = true, imageDataUrl = nu
     const img = document.createElement('img'); img.src = imageDataUrl; img.className = 'msg-img'; img.alt = 'Attachment';
     img.onclick = () => window.open(imageDataUrl, '_blank'); bub.appendChild(img);
   }
+  if (sources && sources.length) {
+    const src = document.createElement('div'); src.className = 'msg-sources';
+    src.innerHTML = '<i class="fas fa-book-open"></i> Based on: ' + sources.map(escapeHtml).join(' · ');
+    bub.appendChild(src);
+  }
   const meta = document.createElement('div'); meta.className = 'msg-meta';
   meta.textContent = new Date().toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' }); bub.appendChild(meta);
+  if (feedback) bub.appendChild(buildFeedbackRow(feedback));
   el.appendChild(av); el.appendChild(bub);
   const msgs = document.getElementById('messages'); msgs.appendChild(el); msgs.scrollTop = msgs.scrollHeight;
   if (save) {
     localMessages.push({ id: uid('m'), ts: Date.now(), from, text });
     if (localMessages.length > CONFIG.MAX_MESSAGES) localMessages = localMessages.slice(-CONFIG.MAX_MESSAGES);
   }
+}
+
+/* ═══════════════════════════════════════════════
+   👍👎  FEEDBACK  →  ARTICLE SCORES + KNOWLEDGE GAPS
+═══════════════════════════════════════════════ */
+function buildFeedbackRow(ctx) {
+  const row = document.createElement('div'); row.className = 'msg-feedback';
+  row.innerHTML =
+    '<span class="fb-label">Was this helpful?</span>' +
+    '<button type="button" class="fb-btn" data-v="up" title="Helpful" aria-label="Helpful"><i class="fas fa-thumbs-up"></i></button>' +
+    '<button type="button" class="fb-btn" data-v="down" title="Not helpful" aria-label="Not helpful"><i class="fas fa-thumbs-down"></i></button>';
+  row.querySelectorAll('.fb-btn').forEach(b => b.addEventListener('click', () => submitFeedback(ctx, b.dataset.v, row)));
+  return row;
+}
+
+async function submitFeedback(ctx, value, row) {
+  if (row.dataset.done) return;
+  row.dataset.done = '1';
+  row.querySelectorAll('.fb-btn').forEach(b => { b.disabled = true; b.classList.toggle('chosen', b.dataset.v === value); });
+  row.querySelector('.fb-label').textContent = value === 'up' ? 'Thanks for the feedback!' : "Thanks, I've noted this so the team can improve it.";
+  try {
+    await addDoc(collection(db, 'feedback'), {
+      uid: currentUser.uid, value,
+      question: redactSensitive(ctx.question).slice(0, 400),
+      answer:   redactSensitive(ctx.answer).slice(0, 1500),
+      articleIds: ctx.articleIds || [], matched: !!ctx.matched,
+      ts: serverTimestamp(),
+    });
+    // Score the articles that grounded this answer (rules only allow +1 on these two counters)
+    await Promise.all((ctx.articleIds || []).map(id =>
+      updateDoc(doc(db, 'kb', id), value === 'up' ? { helpful: increment(1) } : { unhelpful: increment(1) }).catch(() => {})));
+    if (value === 'down') {
+      logGap(ctx.question, 'downvoted');
+      appendMessage({ from: 'bot', text: "Sorry that didn't solve it. Would you like me to open a support ticket so an engineer can help?", save: false });
+      addSuggestion('🎫 Create ticket now', () => openAIFilledTicket());
+    }
+  } catch (e) { console.warn('[Feedback]', e); }
+}
+
+/** Records something the knowledge base could not answer (staff review these on the dashboard). */
+async function logGap(question, reason, extra = {}) {
+  try {
+    const clean = redactSensitive(question).trim().slice(0, 300);
+    if (!clean || !currentUser) return;
+    const key = normalizeQuestion(clean);
+    const sig = `${key}|${reason}|${extra.ticketId || ''}`;
+    if (loggedGapKeys.has(sig)) return;
+    loggedGapKeys.add(sig);
+    await addDoc(collection(db, 'gaps'), {
+      question: clean, key, reason, ticketId: extra.ticketId || null,
+      uid: currentUser.uid, status: 'open', ts: serverTimestamp(),
+    });
+  } catch (e) { console.warn('[Gap]', e); }
 }
 
 let typingEl = null;
@@ -793,15 +878,16 @@ function renderTicketRows(tickets) {
       ${assignedCell}
       <td style="color:var(--text2);font-size:12px;white-space:nowrap;">${timeAgo(t.ts)}</td>
       <td><div class="table-actions">
-        <button class="action-btn view-btn" data-fid="${t.firestoreId}" title="View"><i class="fas fa-eye"></i></button>
-        ${isStaff() ? `<button class="action-btn next-btn" data-fid="${t.firestoreId}" title="Advance status"><i class="fas fa-arrow-right"></i></button>` : ''}
+        <button class="action-btn view-btn" data-fid="${t.firestoreId}" title="View ticket ${escapeHtml(t.id||'')}" aria-label="View ticket ${escapeHtml(t.id||'')}"><i class="fas fa-eye"></i> View Ticket</button>
+        ${isStaff() && t.status !== 'resolved' ? `<button class="action-btn resolve-btn" data-fid="${t.firestoreId}" title="Resolve ticket ${escapeHtml(t.id||'')}" aria-label="Resolve ticket ${escapeHtml(t.id||'')}"><i class="fas fa-circle-check"></i> Resolve Ticket</button>` : ''}
+        ${isStaff() && t.status === 'resolved' ? `<span class="resolved-mark"><i class="fas fa-check"></i> Resolved</span>` : ''}
         ${isAdmin() ? `<button class="action-btn del-btn" data-fid="${t.firestoreId}" title="Delete" style="color:var(--danger)"><i class="fas fa-trash"></i></button>` : ''}
       </div></td>`;
     tbody.appendChild(tr);
   });
 
   tbody.querySelectorAll('.view-btn').forEach(b => b.addEventListener('click', () => openTicketDetail(b.dataset.fid)));
-  tbody.querySelectorAll('.next-btn').forEach(b => b.addEventListener('click', () => advanceTicketStatus(b.dataset.fid)));
+  tbody.querySelectorAll('.resolve-btn').forEach(b => b.addEventListener('click', () => openResolveModal(b.dataset.fid)));
   tbody.querySelectorAll('.del-btn').forEach(b  => b.addEventListener('click', () => deleteTicket(b.dataset.fid)));
 }
 
@@ -822,74 +908,151 @@ function updateSidebarStats(tickets) {
 }
 
 /* ═══════════════════════════════════════════════
-   📚  AUTO-CONVERT RESOLVED TICKET → KB ARTICLE
+   ✅  RESOLVE A TICKET  →  DRAFT KNOWLEDGE ARTICLE
+   The engineer clicks "Resolve Ticket", records what fixed it, and
+   (optionally) a DRAFT article is written for review. Nothing the
+   AI writes reaches users until a human approves it.
 ═══════════════════════════════════════════════ */
+const KB_WRITER_PROMPT = [
+  'You write knowledge base articles for an IT helpdesk. Turn ONE resolved ticket into a reusable article for ANY user who has the same problem.',
+  'Rules:',
+  '- Use ONLY facts given in the ticket and the resolution. Never invent steps, menus, commands, file paths or version numbers.',
+  '- Remove all personal data: names, email addresses, phone numbers, passwords, IP addresses, device names, asset tags.',
+  '- Write for a non-technical office worker. Short sentences. Put button and menu names in **bold**.',
+  'Respond with ONLY a JSON object, no markdown fences, in exactly this shape:',
+  '{"title":"...","tags":["..."],"lines":["## Summary","...","## Steps","1. ...","2. ...","## Escalate to IT if","- ..."]}',
+  '"lines" is the article, one line per array item. Use these headings in this order: "## Summary" (1-2 sentences), "## Quick checks" (bullets starting "- ", only if the ticket supports them, otherwise omit the section), "## Steps" (numbered "1. "), "## Escalate to IT if" (bullets, only if supported, otherwise omit).',
+  'The title should read like the problem a user would describe. Give 4-8 lowercase tags that include words a user would type.',
+].join('\n');
 
-/**
- * Turns a resolved ticket into a polished KB article using Claude
- * (via the Firebase proxy). Falls back to a plain template if the
- * AI call fails, so the feature never silently does nothing.
- */
-async function convertTicketToKB(ticket) {
-  let title, content, tags;
-
-  try {
-    const result = await askClaude({
-      system: 'You turn a resolved IT support ticket into a reusable knowledge base article. Respond ONLY with valid JSON, no markdown or backticks. Format: {"title":"Clear, searchable article title","content":"Step-by-step solution in the same numbered/bulleted format used for IT articles","tags":["tag1","tag2","tag3"]}. Write the content as general guidance other users with the same problem could follow — not tied to this specific person. Use numbered steps if the fix involves actions.',
-      messages: [{
-        role: 'user',
-        content: `Ticket title: ${ticket.title}\nDescription: ${ticket.desc}\nCategory: ${ticket.category}\nResolution notes: ${ticket.notes || '(no notes recorded)'}`,
-      }],
-      max_tokens: 500,
-    });
-    const raw = result.data?.text || '{}';
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    title   = parsed.title   || ticket.title;
-    content = parsed.content || ticket.notes || ticket.desc;
-    tags    = Array.isArray(parsed.tags) ? parsed.tags : [];
-  } catch (e) {
-    console.warn('[KB AutoConvert] AI generation failed, using plain fallback:', e);
-    title   = ticket.title;
-    content = ticket.notes
-      ? `Issue: ${ticket.desc}\n\nResolution:\n${ticket.notes}`
-      : `Issue: ${ticket.desc}\n\n(No resolution notes were recorded for this ticket.)`;
-    tags = [];
-  }
-
-  await addDoc(collection(db, 'kb'), {
-    title,
-    category: ticket.category || 'other',
-    tags,
-    content,
-    ts: serverTimestamp(),
-    views: 0,
-    createdBy: currentUser.uid,
-    sourceTicketId: ticket.id || null,
-    autoGenerated: true,
-  });
-
-  await logActivity(`KB article auto-created from resolved ticket ${ticket.id}: "${title}"`);
-  showToast(`Resolved ticket added to Knowledge Base: "${title}"`, 'success', 6000);
+function extractJson(raw) {
+  const t = String(raw || '');
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) throw new Error('No JSON in AI reply');
+  return JSON.parse(t.slice(a, b + 1));
 }
 
-async function advanceTicketStatus(firestoreId) {
-  const ref  = doc(db,'tickets',firestoreId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-  const t    = snap.data();
-  const idx  = STATUS_FLOW.indexOf(t.status);
-  if (idx < STATUS_FLOW.length - 1) {
-    const next = STATUS_FLOW[idx + 1];
-    await updateDoc(ref, { status: next, updatedAt: serverTimestamp() });
-    await logActivity(`Ticket ${t.id} moved to ${STATUS_LABELS[next]}`);
-    showToast(`Ticket moved to "${STATUS_LABELS[next]}"`, 'success');
-    if (next === 'resolved' && !t.kbConverted) {
-      await updateDoc(ref, { kbConverted: true });
-      convertTicketToKB({ ...t, firestoreId });
-    }
-  } else {
-    showToast('Ticket is already resolved.', 'info');
+/** Writes a DRAFT article from a resolved ticket (AI when available, plain template otherwise). */
+async function convertTicketToKB(ticket) {
+  const resolution = (ticket.resolution || ticket.notes || '').trim();
+  let title, content, tags;
+  try {
+    const result = await askClaude({
+      system: KB_WRITER_PROMPT,
+      messages: [{ role: 'user', content: [
+        `Ticket title: ${ticket.title}`,
+        `Category: ${ticket.category || 'other'}`,
+        `Problem description: ${ticket.desc}`,
+        ticket.rootCause ? `Root cause: ${ticket.rootCause}` : '',
+        `How it was fixed: ${resolution || '(not recorded)'}`,
+      ].filter(Boolean).join('\n') }],
+      max_tokens: 800,
+    });
+    const p = extractJson(result.data?.text);
+    title   = String(p.title || '').trim() || ticket.title;
+    content = Array.isArray(p.lines) ? p.lines.join('\n') : String(p.content || '');
+    if (content.trim().length < 40) throw new Error('AI article too short');
+    tags    = Array.isArray(p.tags) ? p.tags.map(x => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 8) : [];
+  } catch (e) {
+    console.warn('[KB draft] AI generation failed, using plain template:', e);
+    title = ticket.title;
+    const steps = resolution.split(/\n+/).map(x => x.trim()).filter(Boolean);
+    content = ['## Summary', `How this was resolved: ${ticket.title}.`, '## Problem', ticket.desc, '## Resolution',
+      ...steps.map((x, i) => `${i + 1}. ${x.replace(/^\d+[.)]\s*/, '')}`)].join('\n');
+    tags = [];
   }
+  title   = redactSensitive(title);
+  content = redactSensitive(content);
+  if (!tags.length) tags = [...new Set(tokenize(title))].slice(0, 6);
+
+  await addDoc(collection(db, 'kb'), {
+    title, category: ticket.category || 'other', tags, content,
+    status: 'draft', autoGenerated: true, sourceTicketId: ticket.id || null,
+    helpful: 0, unhelpful: 0, views: 0,
+    ts: serverTimestamp(), createdBy: currentUser.uid,
+  });
+  await logActivity(`Draft KB article created from resolved ticket ${ticket.id}: "${title}"`);
+  showToast('Draft article created. Review and approve it in the Knowledge Base tab.', 'success', 8000);
+}
+
+async function openResolveModal(firestoreId) {
+  if (!isStaff()) return;
+  const snap = await getDoc(doc(db, 'tickets', firestoreId));
+  if (!snap.exists()) return;
+  const t = snap.data();
+  if (t.status === 'resolved') { showToast('This ticket is already resolved.', 'info'); return; }
+  resolvingTicket = { firestoreId, data: t };
+  document.getElementById('resolveTicketId').textContent = t.id || '';
+  document.getElementById('resolveSummary').innerHTML = `
+    <div class="rs-title">${escapeHtml(t.title)}</div>
+    <div class="rs-desc">${escapeHtml(t.desc)}</div>
+    <div class="rs-meta">
+      <span class="chip ${getPriorityChipClass(t.priority)}">${escapeHtml(PRIORITY_LABELS[t.priority] || t.priority)}</span>
+      <span class="cat-badge">${escapeHtml(t.category || 'other')}</span>
+      <span class="muted small">${escapeHtml(t.email || '')}</span>
+    </div>`;
+  document.getElementById('resolveText').value  = t.resolution || t.notes || '';
+  document.getElementById('resolveCause').value = t.rootCause || '';
+  const mk = document.getElementById('resolveMakeKB');
+  mk.checked  = !t.kbConverted;
+  mk.disabled = !!t.kbConverted;
+  closeModal('ticketDetailBackdrop');
+  openModal('resolveBackdrop');
+  document.getElementById('resolveText').focus();
+}
+
+async function confirmResolve() {
+  if (!resolvingTicket) return;
+  const { firestoreId, data: t } = resolvingTicket;
+  const resolution = document.getElementById('resolveText').value.trim();
+  const rootCause  = document.getElementById('resolveCause').value.trim();
+  if (resolution.length < 15) { showToast('Please describe what fixed the problem (at least 15 characters).', 'error'); return; }
+  const makeKB = document.getElementById('resolveMakeKB').checked && !t.kbConverted;
+  const me  = currentProfile.name || currentProfile.email;
+  const btn = document.getElementById('confirmResolve');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Resolving…';
+  try {
+    await updateDoc(doc(db, 'tickets', firestoreId), {
+      status: 'resolved', resolution, rootCause: rootCause || null,
+      resolvedBy: me, resolvedByUid: currentUser.uid,
+      resolvedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      assigned: t.assigned || me,
+      kbConverted: makeKB ? true : !!t.kbConverted,
+    });
+    await logActivity(`Ticket ${t.id} resolved by ${me}`);
+    closeModal('resolveBackdrop');
+    resolvingTicket = null;
+    showToast(`Ticket ${t.id} resolved.`, 'success');
+    if (document.getElementById('view-dashboard')?.classList.contains('active')) renderDashboard();
+    if (makeKB) await convertTicketToKB({ ...t, firestoreId, resolution, rootCause });
+  } catch (e) {
+    console.error('[Resolve]', e);
+    showToast('Could not resolve the ticket. Please try again.', 'error');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-circle-check"></i> Resolve Ticket';
+  }
+}
+
+async function startWork(firestoreId) {
+  if (!isStaff()) return;
+  const me = currentProfile.name || currentProfile.email;
+  try {
+    await updateDoc(doc(db, 'tickets', firestoreId), {
+      assigned: me, status: 'in-progress', startedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    await logActivity(`${me} started work on a ticket`);
+    showToast('Ticket assigned to you and marked In Progress.', 'success');
+    closeModal('ticketDetailBackdrop');
+  } catch (e) { showToast('Could not update the ticket.', 'error'); }
+}
+
+/** Kept for compatibility: moves a ticket one step forward; the last step opens the Resolve dialog. */
+async function advanceTicketStatus(firestoreId) {
+  const snap = await getDoc(doc(db, 'tickets', firestoreId));
+  if (!snap.exists()) return;
+  const idx = STATUS_FLOW.indexOf(snap.data().status);
+  if (idx >= STATUS_FLOW.length - 1) { showToast('Ticket is already resolved.', 'info'); return; }
+  await setTicketStatusDirect(firestoreId, STATUS_FLOW[idx + 1]);
 }
 
 async function deleteTicket(firestoreId) {
@@ -936,6 +1099,7 @@ async function createTicketFromForm() {
     };
     await addDoc(collection(db,'tickets'), ticket);
     await logActivity(`New ticket ${ticketId} created — "${title}"`);
+    logGap(title, 'ticket', { ticketId });   // the KB could not solve this: flag it for a new article
     closeModal('ticketModalBackdrop');
     modalAttachments = []; renderModalAttachList();
     appendMessage({ from:'bot', text:`✅ Ticket ${ticketId} created! Category: ${category}. Our team will respond to ${email} shortly.` });
@@ -951,7 +1115,10 @@ async function createTicketFromForm() {
 async function openTicketDetail(firestoreId) {
   const snap = await getDoc(doc(db,'tickets',firestoreId));
   if (!snap.exists()) return;
-  const t    = { firestoreId, ...snap.data() };
+  const t        = { firestoreId, ...snap.data() };
+  const staff    = isStaff();
+  const me       = currentProfile?.name || currentProfile?.email;
+  const resolved = t.status === 'resolved';
   const body = document.getElementById('ticketDetailBody');
   body.innerHTML = `
     <div class="detail-grid">
@@ -961,8 +1128,8 @@ async function openTicketDetail(firestoreId) {
       <div class="detail-field"><label>Priority</label><div class="val"><span class="chip ${getPriorityChipClass(t.priority)}">${escapeHtml(PRIORITY_LABELS[t.priority]||t.priority)}</span></div></div>
       <div class="detail-field"><label>Status</label><div class="val"><span class="chip ${getStatusChipClass(t.status)}">${escapeHtml(STATUS_LABELS[t.status]||t.status)}</span></div></div>
       <div class="detail-field"><label>Email</label><div class="val">${escapeHtml(t.email)}</div></div>
-      ${isStaff() ? `<div class="detail-field"><label>Assigned To</label><div class="val">${escapeHtml(t.assigned||'Unassigned')}</div></div>` : ''}
-      ${isStaff() ? `<div class="detail-field"><label>Created By</label><div class="val">${escapeHtml(t.createdBy||'—')}</div></div>` : ''}
+      ${staff ? `<div class="detail-field"><label>Assigned To</label><div class="val">${escapeHtml(t.assigned||'Unassigned')}</div></div>` : ''}
+      ${staff ? `<div class="detail-field"><label>Created By</label><div class="val">${escapeHtml(t.createdBy||'—')}</div></div>` : ''}
     </div>
     <div class="detail-desc"><label>Description</label><p>${escapeHtml(t.desc)}</p></div>
     ${t.remoteId ? `
@@ -971,19 +1138,32 @@ async function openTicketDetail(firestoreId) {
       <div class="remote-session-display">
         <span class="rs-client">${escapeHtml(t.remoteClient || 'Remote client')}</span>
         <span class="rs-id" id="remoteIdText">${escapeHtml(t.remoteId)}</span>
-        <button class="copy-id-btn" onclick="copyRemoteId('${escapeHtml(t.remoteId).replace(/'/g,"\\'")}')"><i class="fas fa-copy"></i> Copy ID</button>
-        <span class="small muted">Open your own ${escapeHtml(t.remoteClient || 'remote')} client and connect to this ID.</span>
+        ${staff ? `<button class="copy-id-btn" onclick="copyRemoteId('${escapeHtml(t.remoteId).replace(/'/g,"\\'")}')"><i class="fas fa-copy"></i> Copy ID</button>
+        <span class="small muted">Open your own ${escapeHtml(t.remoteClient || 'remote')} client and connect to this ID.</span>` : ''}
       </div>
     </div>` : ''}
-    ${isStaff() ? `
+    ${resolved && t.resolution ? `
+    <div class="detail-desc resolution-block">
+      <label><i class="fas fa-circle-check"></i> Resolution</label>
+      <p>${escapeHtml(t.resolution)}</p>
+      <div class="small muted">Resolved by ${escapeHtml(t.resolvedBy||'IT')}${t.resolvedAt ? ' · ' + formatDate(t.resolvedAt) : ''}${staff && t.rootCause ? ' · Root cause: ' + escapeHtml(t.rootCause) : ''}</div>
+    </div>` : ''}
+    ${staff ? `
+    <div class="detail-actions">
+      ${!resolved && t.assigned !== me ? `<button class="btn btn-ghost" onclick="startWork('${firestoreId}')"><i class="fas fa-hand"></i> Assign to me &amp; start</button>` : ''}
+      ${!resolved
+        ? `<button class="btn" onclick="openResolveModal('${firestoreId}')"><i class="fas fa-circle-check"></i> Resolve Ticket</button>`
+        : `<button class="btn btn-ghost" onclick="setTicketStatusDirect('${firestoreId}','open');closeModal('ticketDetailBackdrop');"><i class="fas fa-rotate-left"></i> Reopen ticket</button>`}
+    </div>
+    <label class="detail-label">Change status</label>
     <div class="detail-status-row">
-      ${STATUS_FLOW.map(s => `<button class="btn ${t.status===s?'':'btn-ghost'}" style="font-size:12px;" onclick="setTicketStatusDirect('${firestoreId}','${s}');closeModal('ticketDetailBackdrop');">${STATUS_LABELS[s]}</button>`).join('')}
+      ${STATUS_FLOW.filter(x => x !== 'resolved').map(x => `<button class="btn ${t.status===x?'':'btn-ghost'}" style="font-size:12px;" onclick="setTicketStatusDirect('${firestoreId}','${x}');closeModal('ticketDetailBackdrop');">${STATUS_LABELS[x]}</button>`).join('')}
     </div>
     <div class="detail-notes">
-      <label>Notes / Updates</label>
-      <textarea id="detailNotes" rows="3" placeholder="Add agent notes…">${escapeHtml(t.notes||'')}</textarea>
+      <label>Internal notes</label>
+      <textarea id="detailNotes" rows="3" placeholder="Working notes (only staff can see these)…">${escapeHtml(t.notes||'')}</textarea>
       <button class="btn" style="margin-top:8px;font-size:12px;" onclick="saveTicketNotes('${firestoreId}')">Save Notes</button>
-      <p class="field-hint" style="margin-top:6px;"><i class="fas fa-circle-info"></i> Notes entered here are used to generate the Knowledge Base article automatically when this ticket is marked Resolved.</p>
+      <p class="field-hint" style="margin-top:6px;"><i class="fas fa-circle-info"></i> When you click <strong>Resolve Ticket</strong> you'll record the final fix. That is what the user sees and what a draft Knowledge Base article is written from.</p>
     </div>` : ''}
   `;
   openModal('ticketDetailBackdrop');
@@ -996,16 +1176,15 @@ function copyRemoteId(id) {
 }
 
 async function setTicketStatusDirect(firestoreId, status) {
+  if (status === 'resolved') { openResolveModal(firestoreId); return; }   // resolving always records the fix
   const ref  = doc(db,'tickets',firestoreId);
   const snap = await getDoc(ref);
-  const t    = snap.exists() ? snap.data() : null;
-  await updateDoc(ref, { status, updatedAt: serverTimestamp() });
-  await logActivity(`Ticket status manually set to ${STATUS_LABELS[status]}`);
+  const prev = snap.exists() ? snap.data().status : null;
+  const patch = { status, updatedAt: serverTimestamp() };
+  if (prev === 'resolved') patch.reopenedAt = serverTimestamp();
+  await updateDoc(ref, patch);
+  await logActivity(`Ticket status set to ${STATUS_LABELS[status]}`);
   showToast(`Status updated to "${STATUS_LABELS[status]}"`, 'success');
-  if (status === 'resolved' && t && !t.kbConverted) {
-    await updateDoc(ref, { kbConverted: true });
-    convertTicketToKB({ ...t, firestoreId });
-  }
 }
 
 async function saveTicketNotes(firestoreId) {
@@ -1061,10 +1240,7 @@ async function clearResolved() {
    📊  DASHBOARD (staff only)
 ═══════════════════════════════════════════════ */
 async function renderDashboard() {
-  const [ticketSnap, kbSnap] = await Promise.all([
-    getDocs(collection(db,'tickets')),
-    getDocs(collection(db,'kb')),
-  ]);
+  const ticketSnap = await getDocs(collection(db,'tickets'));
   const tickets = ticketSnap.docs.map(d => d.data());
   const total   = tickets.length;
   const open    = tickets.filter(t=>t.status==='open').length;
@@ -1077,7 +1253,7 @@ async function renderDashboard() {
   document.getElementById('kpiProgress').textContent = prog;
   document.getElementById('kpiResolved').textContent = res;
   document.getElementById('kpiHigh').textContent     = high;
-  document.getElementById('kpiKB').textContent       = kbSnap.size;
+  document.getElementById('kpiKB').textContent       = kbApproved().length;
 
   const pct = total > 0 ? Math.round((res/total)*100) : 0;
   const arc  = document.getElementById('resolutionArc');
@@ -1095,6 +1271,7 @@ async function renderDashboard() {
 
   await renderActivityFeed();
   renderAgentQueue(tickets.map((t,i) => ({ firestoreId: ticketSnap.docs[i].id, ...t })));
+  await renderLearningPanel();
 
   const el = document.getElementById('dashLastRefresh');
   if (el) el.textContent = 'Refreshed: ' + new Date().toLocaleTimeString('en-KE');
@@ -1145,8 +1322,8 @@ function renderAgentQueue(tickets) {
       <span class="chip ${getPriorityChipClass(t.priority)}">${PRIORITY_LABELS[t.priority]}</span>
       <span class="chip ${getStatusChipClass(t.status)}">${STATUS_LABELS[t.status]}</span>
       <div class="queue-actions">
-        <button class="action-btn" onclick="openTicketDetail('${t.firestoreId}')"><i class="fas fa-eye"></i> View</button>
-        <button class="action-btn" onclick="advanceTicketStatus('${t.firestoreId}');renderDashboard();"><i class="fas fa-arrow-right"></i> Advance</button>
+        <button class="action-btn" onclick="openTicketDetail('${t.firestoreId}')"><i class="fas fa-eye"></i> View Ticket</button>
+        <button class="action-btn resolve-btn" onclick="openResolveModal('${t.firestoreId}')"><i class="fas fa-circle-check"></i> Resolve Ticket</button>
       </div>`;
     queue.appendChild(item);
   });
@@ -1159,52 +1336,135 @@ async function logActivity(text) {
 /* ═══════════════════════════════════════════════
    📚  KNOWLEDGE BASE — FIRESTORE
 ═══════════════════════════════════════════════ */
+const ARTICLE_TEMPLATE = [
+  '## Summary', 'One or two sentences: what problem this solves.',
+  '## Quick checks', '- First thing to check',
+  '## Steps', '1. First step', '2. Second step',
+  '## Escalate to IT if', '- When the user should raise a ticket',
+].join('\n');
+
 async function renderKB() {
   const filter = (document.getElementById('kbSearch')?.value || '').toLowerCase();
   const cat    = document.getElementById('kbFilter')?.value  || '';
+  const st     = document.getElementById('kbStatusFilter')?.value || '';
   const grid   = document.getElementById('kbGrid');
   const empty  = document.getElementById('kbEmpty');
-  if (!grid) return; grid.innerHTML = '';
-  try {
-    const snap     = await getDocs(collection(db,'kb'));
-    const articles = snap.docs.map(d => ({ id:d.id, ...d.data() })).filter(a => {
-      const ms = !filter || (a.title||'').toLowerCase().includes(filter) || (a.content||'').toLowerCase().includes(filter) || (a.tags||[]).some(t=>t.toLowerCase().includes(filter));
-      return ms && (!cat || a.category===cat);
-    });
-    if (!articles.length) { if (empty) empty.style.display = 'flex'; return; }
-    if (empty) empty.style.display = 'none';
-    articles.forEach(a => {
-      const card = document.createElement('div'); card.className = 'kb-card';
-      const canEdit = isStaff();
-      card.innerHTML = `
-        <div class="kb-card-header"><div class="kb-card-title">${escapeHtml(a.title)}</div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">${a.autoGenerated ? `<span class="ai-badge" title="Auto-generated from ticket ${escapeHtml(a.sourceTicketId||'')}"><i class="fas fa-wand-magic-sparkles"></i> Auto</span>` : ''}<span class="cat-badge">${escapeHtml(a.category)}</span></div></div>
-        <div class="kb-card-body">${escapeHtml(a.content)}</div>
-        <div class="kb-card-footer">
-          ${(a.tags||[]).map(t=>`<span class="kb-tag">${escapeHtml(t)}</span>`).join('')}
-          ${canEdit ? `<div class="kb-card-actions"><button class="kb-edit-btn" data-id="${a.id}"><i class="fas fa-pen"></i></button><button class="kb-del-btn" data-id="${a.id}"><i class="fas fa-trash"></i></button></div>` : ''}
-        </div>`;
-      grid.appendChild(card);
-    });
-    grid.querySelectorAll('.kb-edit-btn').forEach(b => b.addEventListener('click', () => openKBModal(b.dataset.id)));
-    grid.querySelectorAll('.kb-del-btn').forEach(b  => b.addEventListener('click', () => deleteKBArticle(b.dataset.id)));
-    const ss3 = document.getElementById('sSKB'); if (ss3) ss3.textContent = snap.size;
-    renderCategoryChips(articles);
-  } catch(e) { console.error('[KB]', e); showToast('Could not load KB articles.','error'); }
+  const banner = document.getElementById('kbReviewBanner');
+  if (!grid) return;
+
+  const all    = kbCache.map(a => ({ ...a, _st: effectiveStatus(a) }));
+  const drafts = all.filter(a => a._st === 'draft');
+  if (banner) {
+    if (isStaff() && drafts.length) {
+      banner.style.display = 'flex';
+      banner.innerHTML = `<i class="fas fa-clipboard-check"></i><span><strong>${drafts.length}</strong> AI-drafted article${drafts.length > 1 ? 's' : ''} waiting for review. The chatbot does not use drafts until you approve them.</span><button class="btn btn-ghost" id="showDraftsBtn">Review now</button>`;
+      banner.querySelector('#showDraftsBtn').addEventListener('click', () => { document.getElementById('kbStatusFilter').value = 'draft'; renderKB(); });
+    } else banner.style.display = 'none';
+  }
+
+  const list = all.filter(a => {
+    const ms = !filter || (a.title||'').toLowerCase().includes(filter) || (a.content||'').toLowerCase().includes(filter) || (a.tags||[]).some(t => t.toLowerCase().includes(filter));
+    return ms && (!cat || a.category === cat) && (!st || a._st === st);
+  }).sort((x, y) => (x._st === 'draft' ? 0 : 1) - (y._st === 'draft' ? 0 : 1) || String(x.title).localeCompare(String(y.title)));
+
+  grid.innerHTML = '';
+  if (!list.length) { if (empty) empty.style.display = 'flex'; return; }
+  if (empty) empty.style.display = 'none';
+
+  list.forEach(a => {
+    const h = articleHealth(a);
+    const card = document.createElement('div');
+    card.className = 'kb-card' + (a._st === 'draft' ? ' kb-draft' : '');
+    card.dataset.id = a.id;
+    card.innerHTML = `
+      <div class="kb-card-header">
+        <div class="kb-card-title">${escapeHtml(a.title)}</div>
+        <div class="kb-badges">
+          <span class="kb-status ${a._st}">${a._st === 'draft' ? 'Draft' : 'Approved'}</span>
+          ${a.autoGenerated ? `<span class="ai-badge" title="Auto-generated from ticket ${escapeHtml(a.sourceTicketId||'')}"><i class="fas fa-wand-magic-sparkles"></i> Auto</span>` : ''}
+          <span class="cat-badge">${escapeHtml(a.category||'other')}</span>
+        </div>
+      </div>
+      <div class="kb-card-body">${escapeHtml(articlePreview(a.content))}</div>
+      <div class="kb-card-footer">
+        ${(a.tags||[]).slice(0,4).map(t => `<span class="kb-tag">${escapeHtml(t)}</span>`).join('')}
+        ${h.votes ? `<span class="kb-votes ${h.flagged ? 'flagged' : ''}" title="Helpful / not helpful votes"><i class="fas fa-thumbs-up"></i> ${h.helpful} <i class="fas fa-thumbs-down"></i> ${h.unhelpful}</span>` : ''}
+        <div class="kb-card-actions">
+          ${a._st === 'draft' ? `<button class="kb-approve-btn" data-id="${a.id}" title="Approve so the chatbot can use it"><i class="fas fa-check"></i> Approve</button>` : ''}
+          <button class="kb-edit-btn" data-id="${a.id}" title="Edit"><i class="fas fa-pen"></i></button>
+          <button class="kb-del-btn" data-id="${a.id}" title="Delete"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  grid.querySelectorAll('.kb-card').forEach(c => c.addEventListener('click', () => openKBView(c.dataset.id)));
+  grid.querySelectorAll('.kb-edit-btn').forEach(b    => b.addEventListener('click', e => { e.stopPropagation(); openKBModal(b.dataset.id); }));
+  grid.querySelectorAll('.kb-del-btn').forEach(b     => b.addEventListener('click', e => { e.stopPropagation(); deleteKBArticle(b.dataset.id); }));
+  grid.querySelectorAll('.kb-approve-btn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setKBStatus(b.dataset.id, 'approved'); }));
 }
 
-function openKBModal(editId = null) {
-  editingKBId = editId;
+function openKBView(id) {
+  const a = kbCache.find(x => x.id === id); if (!a) return;
+  const st = effectiveStatus(a), h = articleHealth(a);
+  document.getElementById('kbViewTitle').textContent = a.title;
+  document.getElementById('kbViewBody').innerHTML = `
+    <div class="kb-view-meta">
+      <span class="kb-status ${st}">${st === 'draft' ? 'Draft: not used by the chatbot' : 'Approved'}</span>
+      <span class="cat-badge">${escapeHtml(a.category||'other')}</span>
+      ${a.autoGenerated ? `<span class="ai-badge"><i class="fas fa-wand-magic-sparkles"></i> Auto-generated${a.sourceTicketId ? ' from ' + escapeHtml(a.sourceTicketId) : ''}</span>` : ''}
+      <span class="kb-votes ${h.flagged ? 'flagged' : ''}"><i class="fas fa-thumbs-up"></i> ${h.helpful} <i class="fas fa-thumbs-down"></i> ${h.unhelpful}${h.flagged ? ' · needs review' : ''}</span>
+    </div>
+    ${(a.tags||[]).length ? `<div class="kb-view-tags">${a.tags.map(t => `<span class="kb-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+    <div class="kb-article msg-text">${formatMessageText(a.content)}</div>
+    ${a.autoGenerated && st === 'draft' ? '<p class="field-hint"><i class="fas fa-circle-info"></i> Written by AI from the resolved ticket. Check every step is correct, edit if needed, then approve.</p>' : ''}`;
+  const act = document.getElementById('kbViewActions'); act.innerHTML = '';
+  const mk = (cls, html, fn) => { const b = document.createElement('button'); b.className = cls; b.innerHTML = html; b.addEventListener('click', fn); act.appendChild(b); };
+  if (st === 'draft') mk('btn', '<i class="fas fa-check"></i> Approve', () => setKBStatus(id, 'approved'));
+  else                mk('btn btn-ghost', '<i class="fas fa-eye-slash"></i> Unpublish', () => setKBStatus(id, 'draft'));
+  mk('btn btn-ghost', '<i class="fas fa-pen"></i> Edit', () => openKBModal(id));
+  if (h.votes) mk('btn btn-ghost', '<i class="fas fa-rotate-left"></i> Reset votes', () => resetKBVotes(id));
+  openModal('kbViewBackdrop');
+}
+
+async function setKBStatus(id, status) {
+  const a = kbCache.find(x => x.id === id); if (!a) return;
+  const me = currentProfile.name || currentProfile.email;
+  const patch = { status, updatedAt: serverTimestamp() };
+  if (status === 'approved') { patch.approvedBy = me; patch.approvedAt = serverTimestamp(); }
+  try {
+    await updateDoc(doc(db, 'kb', id), patch);
+    await logActivity(`KB article ${status === 'approved' ? 'approved' : 'unpublished'}: "${a.title}"`);
+    showToast(status === 'approved' ? 'Article approved. The chatbot can now use it.' : 'Article unpublished.', 'success');
+    if (status === 'approved' && a.sourceTicketId) await resolveGapsForTicket(a.sourceTicketId);
+    closeModal('kbViewBackdrop');
+  } catch (e) { console.error('[KB]', e); showToast('Could not update the article.', 'error'); }
+}
+
+async function resetKBVotes(id) {
+  if (!confirm('Reset the helpful / not helpful votes for this article?')) return;
+  try {
+    await updateDoc(doc(db, 'kb', id), { helpful: 0, unhelpful: 0 });
+    showToast('Votes reset.', 'success');
+    closeModal('kbViewBackdrop');
+  } catch (e) { showToast('Could not reset votes.', 'error'); }
+}
+
+function openKBModal(editId = null, prefill = null) {
+  editingKBId   = editId;
+  pendingGapIds = prefill?.gapIds || [];
+  closeModal('kbViewBackdrop');
   document.getElementById('kbModalTitleText').textContent = editId ? 'Edit KB Article' : 'Add KB Article';
   const titleIn = document.getElementById('kbTitle'), catIn = document.getElementById('kbCategory');
   const tagsIn  = document.getElementById('kbTags'),  contIn = document.getElementById('kbContent');
+  const statIn  = document.getElementById('kbStatus');
   if (editId) {
-    getDoc(doc(db,'kb',editId)).then(snap => {
-      if (!snap.exists()) return;
-      const a = snap.data();
-      titleIn.value = a.title; catIn.value = a.category; tagsIn.value = (a.tags||[]).join(', '); contIn.value = a.content;
-    });
+    const a = kbCache.find(x => x.id === editId); if (!a) return;
+    titleIn.value = a.title; catIn.value = a.category || 'other'; tagsIn.value = (a.tags||[]).join(', ');
+    contIn.value = a.content; statIn.value = effectiveStatus(a);
   } else {
-    titleIn.value = catIn.value = tagsIn.value = contIn.value = '';
+    titleIn.value = prefill?.title || ''; catIn.value = prefill?.category || 'other';
+    tagsIn.value  = prefill?.tags  || ''; contIn.value = prefill?.content || ''; statIn.value = 'approved';
   }
   openModal('kbModalBackdrop'); titleIn.focus();
 }
@@ -1214,26 +1474,127 @@ async function saveKBArticle() {
   const cat     = document.getElementById('kbCategory').value;
   const tags    = document.getElementById('kbTags').value.split(',').map(t=>t.trim()).filter(Boolean);
   const content = document.getElementById('kbContent').value.trim();
+  const status  = document.getElementById('kbStatus').value || 'approved';
   if (!title)   { showToast('Title is required.','error'); return; }
   if (!content) { showToast('Content is required.','error'); return; }
+  const me = currentProfile.name || currentProfile.email;
   try {
+    let sourceTicketId = null;
     if (editingKBId) {
-      await updateDoc(doc(db,'kb',editingKBId), { title,category:cat,tags,content,updatedAt:serverTimestamp() });
+      const prev  = kbCache.find(x => x.id === editingKBId);
+      const patch = { title, category: cat, tags, content, status, updatedAt: serverTimestamp(), updatedBy: me };
+      if (status === 'approved' && effectiveStatus(prev || {}) !== 'approved') { patch.approvedBy = me; patch.approvedAt = serverTimestamp(); }
+      await updateDoc(doc(db,'kb',editingKBId), patch);
+      sourceTicketId = prev?.sourceTicketId || null;
       showToast('Article updated!','success');
       await logActivity(`KB article updated: "${title}"`);
     } else {
-      await addDoc(collection(db,'kb'), { title,category:cat,tags,content,ts:serverTimestamp(),views:0,createdBy:currentUser.uid });
+      await addDoc(collection(db,'kb'), {
+        title, category: cat, tags, content, status, helpful: 0, unhelpful: 0, views: 0,
+        ts: serverTimestamp(), createdBy: currentUser.uid, approvedBy: status === 'approved' ? me : null,
+      });
       showToast('Article added!','success');
       await logActivity(`KB article added: "${title}"`);
     }
-    closeModal('kbModalBackdrop'); renderKB();
-  } catch(e) { showToast('Failed to save article.','error'); }
+    if (status === 'approved') {
+      if (pendingGapIds.length) await closeGaps(pendingGapIds, 'resolved');
+      if (sourceTicketId)       await resolveGapsForTicket(sourceTicketId);
+    }
+    pendingGapIds = [];
+    closeModal('kbModalBackdrop');
+  } catch(e) { console.error('[KB]', e); showToast('Failed to save article.','error'); }
 }
 
 async function deleteKBArticle(id) {
   if (!confirm('Delete this KB article?')) return;
-  await deleteDoc(doc(db,'kb',id));
-  showToast('Article deleted.','info'); renderKB();
+  try { await deleteDoc(doc(db,'kb',id)); showToast('Article deleted.','info'); }
+  catch (e) { showToast('Could not delete the article.','error'); }
+}
+
+/* ═══════════════════════════════════════════════
+   🧠  KNOWLEDGE GAPS + LEARNING PANEL (dashboard)
+═══════════════════════════════════════════════ */
+async function closeGaps(ids, status) {
+  if (!ids?.length) return;
+  const batch = writeBatch(db);
+  ids.forEach(id => batch.update(doc(db, 'gaps', id), { status, closedBy: currentUser.uid, closedAt: serverTimestamp() }));
+  await batch.commit();
+}
+
+async function resolveGapsForTicket(ticketId) {
+  try {
+    const snap = await getDocs(query(collection(db, 'gaps'), where('ticketId', '==', ticketId)));
+    await closeGaps(snap.docs.filter(d => d.data().status === 'open').map(d => d.id), 'resolved');
+  } catch (e) { console.warn('[Gaps]', e); }
+}
+
+const GAP_LABELS = { no_match: 'No article', downvoted: 'Not helpful', ticket: 'Led to ticket' };
+
+async function renderLearningPanel() {
+  if (!isStaff() || !document.getElementById('learningPanel')) return;
+  const approved = kbApproved();
+  const drafts   = kbCache.filter(a => effectiveStatus(a) === 'draft');
+  document.getElementById('lsApproved').textContent = approved.length;
+  document.getElementById('lsDrafts').textContent   = drafts.length;
+
+  let up = 0, down = 0;
+  try {
+    const fs = await getDocs(query(collection(db, 'feedback'), orderBy('ts', 'desc'), limit(200)));
+    fs.docs.forEach(d => (d.data().value === 'up' ? up++ : down++));
+  } catch (e) { console.warn('[Feedback read]', e); }
+  const hr = document.getElementById('lsHelpful');
+  hr.textContent = (up + down) ? Math.round(up / (up + down) * 100) + '%' : '–';
+  hr.title = `${up} helpful, ${down} not helpful (latest ${up + down} ratings)`;
+
+  let gaps = [];
+  try {
+    const gs = await getDocs(query(collection(db, 'gaps'), where('status', '==', 'open')));
+    gaps = gs.docs.map(d => { const g = d.data(); return { id: d.id, question: g.question, key: g.key, reason: g.reason, ticketId: g.ticketId, tsMs: g.ts?.toMillis ? g.ts.toMillis() : 0 }; });
+  } catch (e) { console.warn('[Gaps read]', e); }
+  gapGroups = groupGaps(gaps);
+  document.getElementById('lsGaps').textContent = gapGroups.length;
+
+  const list = document.getElementById('gapList');
+  list.innerHTML = gapGroups.length ? '' : '<div class="gap-empty"><i class="fas fa-circle-check"></i> No open gaps. The knowledge base is keeping up.</div>';
+  gapGroups.slice(0, 8).forEach((g, i) => {
+    const item = document.createElement('div'); item.className = 'gap-item';
+    item.innerHTML = `
+      <div class="gap-main">
+        <div class="gap-q">${escapeHtml(g.question)}</div>
+        <div class="gap-meta">${g.count > 1 ? `<span class="gap-count">×${g.count}</span>` : ''}${g.reasons.map(r => `<span class="gap-reason ${r}">${GAP_LABELS[r] || r}</span>`).join('')}${g.lastTs ? `<span class="muted small">${timeAgo(g.lastTs)}</span>` : ''}</div>
+      </div>
+      <div class="gap-actions">
+        <button class="action-btn" data-act="write" data-i="${i}"><i class="fas fa-pen"></i> Write article</button>
+        <button class="action-btn" data-act="dismiss" data-i="${i}" title="Dismiss (not a real gap)"><i class="fas fa-xmark"></i></button>
+      </div>`;
+    list.appendChild(item);
+  });
+  list.querySelectorAll('[data-act="write"]').forEach(b   => b.addEventListener('click', () => startArticleFromGap(+b.dataset.i)));
+  list.querySelectorAll('[data-act="dismiss"]').forEach(b => b.addEventListener('click', () => dismissGap(+b.dataset.i)));
+
+  const flagged = approved.filter(a => articleHealth(a).flagged);
+  const fl = document.getElementById('flaggedList');
+  fl.innerHTML = flagged.length ? '' : '<div class="gap-empty"><i class="fas fa-circle-check"></i> No articles are underperforming.</div>';
+  flagged.forEach(a => {
+    const h = articleHealth(a);
+    const item = document.createElement('div'); item.className = 'gap-item flagged';
+    item.innerHTML = `<div class="gap-main"><div class="gap-q">${escapeHtml(a.title)}</div><div class="gap-meta"><span class="kb-votes flagged"><i class="fas fa-thumbs-up"></i> ${h.helpful} <i class="fas fa-thumbs-down"></i> ${h.unhelpful}</span></div></div><div class="gap-actions"><button class="action-btn" data-id="${a.id}"><i class="fas fa-eye"></i> Review</button></div>`;
+    item.querySelector('button').addEventListener('click', () => { switchView('kb'); openKBView(a.id); });
+    fl.appendChild(item);
+  });
+}
+
+function startArticleFromGap(i) {
+  const g = gapGroups[i]; if (!g) return;
+  const q = g.question.replace(/[?.!\s]+$/, '');
+  switchView('kb');
+  openKBModal(null, { title: q.charAt(0).toUpperCase() + q.slice(1), category: 'other', content: ARTICLE_TEMPLATE, gapIds: g.ids });
+}
+
+async function dismissGap(i) {
+  const g = gapGroups[i]; if (!g) return;
+  try { await closeGaps(g.ids, 'dismissed'); showToast('Gap dismissed.', 'info'); renderLearningPanel(); }
+  catch (e) { showToast('Could not dismiss the gap.', 'error'); }
 }
 
 function renderCategoryChips(articles = []) {
@@ -1338,7 +1699,7 @@ async function handleSend() {
     new Promise(r => setTimeout(r, CONFIG.TYPING_DELAY_MS)),
   ]);
   hideTyping(); resetSuggestions();
-  appendMessage({ from:'bot', text: aiResult.text });
+  appendMessage({ from:'bot', text: aiResult.text, feedback: aiResult.feedbackCtx, sources: aiResult.sources });
   if (aiResult.suggestTicket) {
     addSuggestion('🎫 Create ticket now', () => openAIFilledTicket());
     addSuggestion('✍️ Fill manually',      () => openTicketModal({ title: text }));
@@ -1410,6 +1771,8 @@ function bindAuthEvents() {
 }
 
 function bindAppEvents() {
+  if (appEventsBound) return;   // otherwise every re-login would stack duplicate handlers
+  appEventsBound = true;
   // Nav tabs
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => switchView(tab.dataset.view));
@@ -1488,20 +1851,46 @@ function bindAppEvents() {
   document.getElementById('closeRoleModal')?.addEventListener('click',   () => closeModal('changeRoleBackdrop'));
   document.getElementById('cancelRoleChange')?.addEventListener('click', () => closeModal('changeRoleBackdrop'));
   document.getElementById('confirmRoleChange')?.addEventListener('click', confirmRoleChange);
+  // Knowledge base: review, import, viewer
+  document.getElementById('importStarterBtn')?.addEventListener('click', () => importStarterArticles());
+  document.getElementById('kbStatusFilter')?.addEventListener('change', () => renderKB());
+  document.getElementById('closeKbView')?.addEventListener('click',  () => closeModal('kbViewBackdrop'));
+  document.getElementById('closeKbView2')?.addEventListener('click', () => closeModal('kbViewBackdrop'));
+  // Resolve ticket
+  document.getElementById('closeResolve')?.addEventListener('click',   () => closeModal('resolveBackdrop'));
+  document.getElementById('cancelResolve')?.addEventListener('click',  () => closeModal('resolveBackdrop'));
+  document.getElementById('confirmResolve')?.addEventListener('click', confirmResolve);
   // Close modals on backdrop click
-  ['ticketModalBackdrop','kbModalBackdrop','ticketDetailBackdrop','changeRoleBackdrop'].forEach(id => {
+  ['ticketModalBackdrop','kbModalBackdrop','ticketDetailBackdrop','changeRoleBackdrop','kbViewBackdrop','resolveBackdrop'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', e => { if (e.target.id === id) closeModal(id); });
   });
   // Escape key
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') ['ticketModalBackdrop','kbModalBackdrop','ticketDetailBackdrop','changeRoleBackdrop'].forEach(id => closeModal(id));
+    if (e.key === 'Escape') ['ticketModalBackdrop','kbModalBackdrop','ticketDetailBackdrop','changeRoleBackdrop','kbViewBackdrop','resolveBackdrop'].forEach(id => closeModal(id));
   });
 }
 
 /* ═══════════════════════════════════════════════
    🚀  BOOTSTRAP
 ═══════════════════════════════════════════════ */
+/** Swaps the robot icon for the logo if the file exists; otherwise the robot icon is kept. */
+function applyLogo() {
+  if (!CONFIG.LOGO_URL) return;
+  const img = new Image();
+  img.onload = () => {
+    const root = document.documentElement;
+    root.style.setProperty('--logo-url', `url("${CONFIG.LOGO_URL}")`);
+    root.classList.add('has-logo');
+    let link = document.querySelector('link[rel~="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.href = CONFIG.LOGO_URL;
+  };
+  img.onerror = () => console.info('[Logo] not found, keeping the robot icon:', CONFIG.LOGO_URL);
+  img.src = CONFIG.LOGO_URL;
+}
+
 function bootstrap() {
+  applyLogo();
   // Restore theme
   try { const saved = localStorage.getItem('kv_theme'); if (saved) darkMode = saved !== 'light'; } catch(e) {}
   applyTheme();
@@ -1543,7 +1932,7 @@ function bootstrap() {
 
       // Seed KB (staff only, idempotent)
       await seedKBIfEmpty();
-      renderKB(); // warm up sidebar KB count
+      setupKBListener();   // live KB cache: powers retrieval, the KB tab and the dashboard
 
       // Show chat ticket listener
       setupTicketListener();
@@ -1576,5 +1965,7 @@ window.advanceTicketStatus   = advanceTicketStatus;
 window.setTicketStatusDirect = setTicketStatusDirect;
 window.saveTicketNotes       = saveTicketNotes;
 window.copyRemoteId          = copyRemoteId;
+window.openResolveModal      = openResolveModal;
+window.startWork             = startWork;
 window.closeModal            = closeModal;
 window.renderDashboard       = renderDashboard;

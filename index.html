@@ -81,15 +81,7 @@
         </div>
       </div>
       <div class="form-row">
-        <label for="signupRole">Account Type</label>
-        <div class="input-icon-wrap">
-          <i class="fas fa-id-badge"></i>
-          <select id="signupRole">
-            <option value="user">User — I need IT support</option>
-            <option value="engineer">Engineer — I provide IT support</option>
-          </select>
-        </div>
-        <span class="field-hint"><i class="fas fa-circle-info"></i> Admin accounts are created by existing admins only.</span>
+        <span class="field-hint"><i class="fas fa-circle-info"></i> New accounts start as <strong>User</strong>. IT staff are promoted to Engineer or Admin by an administrator.</span>
       </div>
       <div class="auth-error" id="signupError" role="alert"></div>
       <button class="btn auth-submit" id="signupBtn">
@@ -307,6 +299,19 @@
         <h4><i class="fas fa-triangle-exclamation"></i> Tickets Awaiting Action</h4>
         <div id="agentQueue" class="agent-queue"></div>
       </div>
+      <div class="dash-card dash-full" id="learningPanel">
+        <h4><i class="fas fa-brain"></i> Learning loop: knowledge gaps &amp; article quality</h4>
+        <div class="learn-stats">
+          <div class="learn-stat"><strong id="lsApproved">0</strong><span>Approved articles</span></div>
+          <div class="learn-stat"><strong id="lsDrafts">0</strong><span>Drafts to review</span></div>
+          <div class="learn-stat"><strong id="lsHelpful">–</strong><span>Helpful rate</span></div>
+          <div class="learn-stat"><strong id="lsGaps">0</strong><span>Open knowledge gaps</span></div>
+        </div>
+        <div class="learn-cols">
+          <div><h5>Unanswered questions</h5><div id="gapList" class="gap-list"></div></div>
+          <div><h5>Articles needing attention</h5><div id="flaggedList" class="gap-list"></div></div>
+        </div>
+      </div>
     </div>
 
     <!-- ─── KNOWLEDGE BASE (staff only) ─── -->
@@ -322,9 +327,16 @@
             <option value="email">Email</option><option value="security">Security</option>
             <option value="other">Other</option>
           </select>
+          <select id="kbStatusFilter">
+            <option value="">All statuses</option>
+            <option value="draft">Needs review (draft)</option>
+            <option value="approved">Approved</option>
+          </select>
+          <button class="btn btn-ghost admin-only" id="importStarterBtn" style="display:none;" title="Add the professional starter articles"><i class="fas fa-box-archive"></i> Load Starter Articles</button>
           <button class="btn" id="addKbBtn"><i class="fas fa-plus"></i> Add Article</button>
         </div>
       </div>
+      <div id="kbReviewBanner" class="review-banner" style="display:none;"></div>
       <div class="kb-grid" id="kbGrid"></div>
       <div id="kbEmpty" class="empty-state" style="display:none;"><i class="fas fa-book-open"></i><p>No articles yet.</p></div>
     </div>
@@ -420,7 +432,8 @@
         <div class="form-row form-row-full"><label for="kbTitle">Title <span class="req">*</span></label><input id="kbTitle" type="text" placeholder="E.g., How to reset your password"></div>
         <div class="form-row"><label for="kbCategory">Category <span class="req">*</span></label><select id="kbCategory"><option value="hardware">Hardware</option><option value="software">Software</option><option value="network">Network</option><option value="account">Account</option><option value="email">Email</option><option value="security">Security</option><option value="other">Other</option></select></div>
         <div class="form-row"><label for="kbTags">Tags (comma separated)</label><input id="kbTags" type="text" placeholder="password, login, reset"></div>
-        <div class="form-row form-row-full"><label for="kbContent">Content <span class="req">*</span></label><textarea id="kbContent" rows="8" placeholder="Write solution steps here…"></textarea></div>
+        <div class="form-row form-row-full"><label for="kbStatus">Status</label><select id="kbStatus"><option value="approved">Approved: the chatbot will use this article</option><option value="draft">Draft: hidden from the chatbot until approved</option></select></div>
+        <div class="form-row form-row-full"><label for="kbContent">Content <span class="req">*</span></label><textarea id="kbContent" rows="8" placeholder="Use ## Summary, ## Steps (1. 2. 3.) and ## Escalate to IT if… Supports **bold** and - bullets."></textarea></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -439,6 +452,40 @@
     </div>
     <div class="modal-body" id="ticketDetailBody"></div>
     <div class="modal-footer"><button class="btn btn-ghost" id="closeTicketDetail2">Close</button></div>
+  </div>
+</div>
+
+<!-- KB Article Viewer -->
+<div class="modal-backdrop" id="kbViewBackdrop" aria-hidden="true">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-book-open"></i> <span id="kbViewTitle">Article</span></h3>
+      <button class="modal-close" id="closeKbView"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="kbViewBody"></div>
+    <div class="modal-footer"><span id="kbViewActions" class="kb-view-actions"></span><button class="btn btn-ghost" id="closeKbView2">Close</button></div>
+  </div>
+</div>
+
+<!-- Resolve Ticket Modal (staff) -->
+<div class="modal-backdrop" id="resolveBackdrop" aria-hidden="true">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-circle-check"></i> Resolve Ticket <span id="resolveTicketId" class="tid-pill"></span></h3>
+      <button class="modal-close" id="closeResolve"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="resolve-summary" id="resolveSummary"></div>
+      <div class="form-grid">
+        <div class="form-row form-row-full"><label for="resolveCause">Root cause <span class="muted">(optional)</span></label><input id="resolveCause" type="text" maxlength="200" placeholder="E.g., The print spooler service had stopped"></div>
+        <div class="form-row form-row-full"><label for="resolveText">What fixed it? <span class="req">*</span></label><textarea id="resolveText" rows="5" maxlength="2000" placeholder="Describe the steps you took, in order…"></textarea><span class="field-hint"><i class="fas fa-circle-info"></i> Be specific. The user sees this, and it is used to write the Knowledge Base article.</span></div>
+        <div class="form-row form-row-full"><label class="check-row"><input type="checkbox" id="resolveMakeKB" checked> Create a <strong>draft</strong> Knowledge Base article from this fix (you review it before the chatbot uses it)</label></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelResolve">Cancel</button>
+      <button class="btn" id="confirmResolve"><i class="fas fa-circle-check"></i> Resolve Ticket</button>
+    </div>
   </div>
 </div>
 
