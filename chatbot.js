@@ -32,16 +32,16 @@ const CONFIG = {
   MAX_MESSAGES:    150,
   MAX_FILE_SIZE_MB: 5,
   TYPING_DELAY_MS: 600,
-  COMPANY_NAME:    'Kelvinet Technologies',
-  SUPPORT_EMAIL:   'support@kelvinet.co.ke',
+  COMPANY_NAME: 'Kelvinet Technologies',
+  SUPPORT_EMAIL: 'support@kelvinet.co.ke',
   // Your logo. Put the file next to index.html (names are case-sensitive on GitHub Pages).
   // If it loads, it replaces the robot icon and becomes the browser-tab icon.
   // Set to '' to always use the robot icon.
-  LOGO_URL:        'logo.png',
+  LOGO_URL: 'logo.png',
   // Facts the assistant may share when users ask who built it or what the company does.
   DEVELOPER_NAME:  'Kelvin Mwichwiri Gitonga',
-  DEVELOPER_ROLE:  'Founder and Lead Developer of Kelvinet Technologies',
-  COMPANY_SERVICES:'web development, networking, cybersecurity, IT support, digital marketing and IT consultancy',
+  DEVELOPER_ROLE:  'founder and lead developer of Kelvinet Technologies',
+  COMPANY_SERVICES: 'web development, networking, cybersecurity, IT support, digital marketing and IT consultancy',
 };
 
 /* ═══════════════════════════════════════════════
