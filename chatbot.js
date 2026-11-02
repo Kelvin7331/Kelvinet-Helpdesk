@@ -40,7 +40,7 @@ const CONFIG = {
   LOGO_URL:        'logo.png',
   // Facts the assistant may share when users ask who built it or what the company does.
   DEVELOPER_NAME:  'Kelvin Mwichwiri Gitonga',
-  DEVELOPER_ROLE:  'founder and lead developer of Kelvinet Technologies',
+  DEVELOPER_ROLE:  'Founder and Lead Developer of Kelvinet Technologies',
   COMPANY_SERVICES:'web development, networking, cybersecurity, IT support, digital marketing and IT consultancy',
 };
 
