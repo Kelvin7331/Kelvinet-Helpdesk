@@ -40,7 +40,7 @@ const CONFIG = {
   LOGO_URL: 'logo.png',
   // Facts the assistant may share when users ask who built it or what the company does.
   DEVELOPER_NAME:  'Kelvin Mwichwiri Gitonga',
-  DEVELOPER_ROLE:  'founder and lead developer of Kelvinet Technologies',
+  DEVELOPER_ROLE:  'CEO and Founder of Kelvinet Technologies',
   COMPANY_SERVICES: 'web development, networking, cybersecurity, IT support, digital marketing and IT consultancy',
 };
 
@@ -63,6 +63,7 @@ import {
   onSnapshot, serverTimestamp, runTransaction, increment, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { STARTER_KB, STARTER_KB_VERSION, LEGACY_STARTER_TITLES } from './kb-seed.js';
+import { FOUNDER_PROFILE, FOUNDER_KNOWLEDGE } from './founder-profile.js';
 import {
   tokenize, topRelevant, buildKBContext, isSmallTalk, redactSensitive,
   normalizeQuestion, groupGaps, articleHealth, effectiveStatus, articlePreview,
@@ -477,12 +478,15 @@ Your role:
 - When you can categorize the issue, append: [CATEGORY:hardware|software|network|account|email|security|other]
 - When you can suggest a priority, append: [PRIORITY:low|normal|high|critical]
 
-ABOUT THIS ASSISTANT (use this when asked who built you, who the developer is, or what the company does):
-- You were designed and built by ${CONFIG.DEVELOPER_NAME}, ${CONFIG.DEVELOPER_ROLE}, based in Maua, Meru, Kenya.
+ABOUT THIS ASSISTANT AND ITS FOUNDER:
+- You are an AI assistant for ${CONFIG.COMPANY_NAME}. You are not Kelvin and must never imply that you are a human.
+- Use the detailed founder knowledge below when users ask about Kelvin Mwichwiri Gitonga, his background, expertise, projects, motivation or company.
 - ${CONFIG.COMPANY_NAME} offers ${CONFIG.COMPANY_SERVICES}.
-- To contact the company, users can email ${CONFIG.SUPPORT_EMAIL} or raise a ticket in this app.
-- You are an AI assistant, never a human. If asked which AI model you run on, say it is a third-party language model; do not claim Kelvinet trained it.
-- Share only this professional information. Never guess or invent personal details (phone numbers, addresses, family, finances), credentials, awards or links.
+- For support enquiries, users can email ${CONFIG.SUPPORT_EMAIL} or raise a ticket in this app.
+- If asked which AI model you run on, say you use a third-party AI model through a secure integration; do not claim Kelvinet trained the model.
+- Do not invent facts or reveal information that is not in the approved profile.
+
+${FOUNDER_KNOWLEDGE}
 
 FORMATTING RULES — follow strictly every time:
 1. NEVER write a large paragraph. Break all responses into short, scannable lines.
@@ -566,10 +570,16 @@ function getFallbackReply(userText, results = []) {
   if (/^(hi|hello|hey|good (morning|afternoon|evening))\b/.test(t)) return { text: `Hi! I'm the Kelvinet IT Assistant. How can I help you today?` };
   if (/^(thanks?|thank you)\b/.test(t))  return { text: "You're welcome! Happy to help. 😊" };
   if (/^(bye|goodbye)\b/.test(t))        return { text: 'Goodbye! Have a productive day. 👋' };
-  if (/\b(who|which company)\b.*\b(made|built|created|developed|designed|programmed|owns)\b.*\byou\b|\b(your|the)\s+(developer|creator|maker)\b|\bwho is kelvin\b/.test(t))
-    return { text: `I was designed and built by ${CONFIG.DEVELOPER_NAME}, ${CONFIG.DEVELOPER_ROLE}, in Maua, Meru, Kenya. You can reach the team at ${CONFIG.SUPPORT_EMAIL}.` };
+  if (/\b(who is|tell me about|about)\b.*\b(kelvin|kelvin mwichwiri|mwichwiri gitonga)\b|\b(kelvin mwichwiri|mwichwiri gitonga)\b.*\b(bio|biography|background|profile)\b/.test(t))
+    return { text: `**${FOUNDER_PROFILE.fullName}** is the ${FOUNDER_PROFILE.title} of ${FOUNDER_PROFILE.company}. He is a Kenyan ${FOUNDER_PROFILE.professionalIdentity.toLowerCase()}, based in ${FOUNDER_PROFILE.location}. He holds a ${FOUNDER_PROFILE.education} His work focuses on practical software development, ICT solutions, networking and technology that addresses real-world needs. His motivation is: “${FOUNDER_PROFILE.motivation}”` };
+  if (/\b(what|which)\b.*\b(projects?)\b.*\b(kelvin|founder)\b|\b(kelvin|founder)\b.*\b(projects?)\b/.test(t))
+    return { text: `Kelvin's projects include Kelvinet Smart IT Helpdesk, e-DocSafe, KEMS, MMH-SRS, a Gatepass Management System and the Kelvinet To-Do Application. Their development status and capabilities vary; ask about any project for more detail.` };
+  if (/\b(why|motivation|inspired)\b.*\b(kelvinet|kelvin|found)\b|\bwhy was kelvinet founded\b/.test(t))
+    return { text: `Kelvin's motivation for founding Kelvinet Technologies is that technology should solve real-world problems and make work simpler.` };
+  if (/\b(who|which company)\b.*\b(made|built|created|developed|designed|programmed|owns)\b.*\byou\b|\b(your|the)\s+(developer|creator|maker)\b/.test(t))
+    return { text: `I was designed and built for ${CONFIG.COMPANY_NAME} by ${FOUNDER_PROFILE.fullName}, its ${FOUNDER_PROFILE.title}. ${FOUNDER_PROFILE.professionalIdentity}.` };
   if (/\b(about|what does|who is)\b.*\bkelvinet\b/.test(t))
-    return { text: `${CONFIG.COMPANY_NAME} offers ${CONFIG.COMPANY_SERVICES}. You can reach the team at ${CONFIG.SUPPORT_EMAIL}.` };
+    return { text: `${CONFIG.COMPANY_NAME} is a technology brand founded by ${FOUNDER_PROFILE.fullName}. It offers ${CONFIG.COMPANY_SERVICES}. Its guiding motivation is to use technology to solve real-world problems and make work simpler.` };
   if (results.length) {
     const a = results[0].article;
     return { text: `I'm in offline mode, but our guide on **${a.title}** should help:\n\n${a.content}`, suggestTicket: false, category: a.category };

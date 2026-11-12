@@ -91,6 +91,7 @@ The browser never sees the AI key. Users only ever receive **approved** Knowledg
 ├── chatbot.css             # Styles (dark/light themes, responsive)
 ├── logo.png                # Platform logo:
 ├── chatbot.js              # App logic: auth, tickets, chat, feedback, resolve flow
+├── founder-profile.js      # Approved founder biography, expertise, projects and company context
 ├── kb-engine.js            # Pure retrieval / scoring / redaction / gap-grouping logic
 ├── kb-seed.js              # 25 professional starter articles
 ├── firestore.rules         # Firestore security rules (publish in the Firebase console)
@@ -100,6 +101,8 @@ The browser never sees the AI key. Users only ever receive **approved** Knowledg
 ```
 
 `kb-engine.js` has no browser or Firebase dependencies, so it can be unit-tested in Node.
+
+**Founder profile:** `founder-profile.js` contains the approved professional information used by the AI assistant when users ask about Kelvin Mwichwiri Gitonga or Kelvinet Technologies. Update this file when verified biography, project or company information changes. The file is imported by `chatbot.js`; do not remove it unless you also remove that import and the related prompt references.
 
 **Branding:** if `logo.png` is present it replaces the robot icon in the chat header, bot messages and typing indicator, and becomes the browser-tab icon. If it is missing the robot icon is used. Change `LOGO_URL` in the `CONFIG` block of `chatbot.js` to use a different file name.
 
