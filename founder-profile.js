@@ -11,7 +11,6 @@ export const FOUNDER_PROFILE = Object.freeze({
   title: 'CEO and Founder',
   professionalIdentity: 'Web Developer | ICT Specialist | Tech Enthusiast',
   location: 'Maua, Meru County, Kenya',
-  education: 'Diploma in Information and Communication Technology (ICT), Mukiria Technical Training Institute.',
   motivation: 'Technology should solve real-world problems and make work simpler.',
   philosophy: 'Deciphering Complexity, Creating Simplicity.',
   company: 'Kelvinet Technologies',
@@ -26,7 +25,6 @@ IDENTITY
 - Official title: ${FOUNDER_PROFILE.title} of ${FOUNDER_PROFILE.company}.
 - Professional identity: ${FOUNDER_PROFILE.professionalIdentity}.
 - Location: ${FOUNDER_PROFILE.location}.
-- Education: ${FOUNDER_PROFILE.education}.
 
 PROFESSIONAL BIOGRAPHY
 Kelvin Mwichwiri Gitonga is a Kenyan web developer, ICT specialist and technology enthusiast. He is the CEO and Founder of Kelvinet Technologies, a technology-focused business developing practical ICT services and digital solutions. His work and interests span web development, software development, ICT support, computer maintenance, networking, cybersecurity, digital transformation and AI-enabled applications.
