@@ -2,9 +2,9 @@
 
 An AI-powered IT support chatbot and ticketing system built with **vanilla HTML, CSS and JavaScript**, **Firebase** (Auth + Firestore) and a **Cloudflare Worker** that keeps the AI key off the browser. Users describe a problem in chat, get step-by-step help instantly, and escalate to a ticket when the bot can't fix it. Engineers and admins manage everything from a live dashboard.
 
-Built by https://kelvinmwichwiri.netlify.app/ — Maua, Meru, Kenya.
+Built with ♥️ by [Kelvin Mwichwiri](kelvinmwichwiri.netlify.app) — Maua, Meru, Kenya.
 
-> **Live demo:** `https://kelvin7331.github.io/Kelvinet-Helpdesk/`
+> **Live demo:** `kelvin7331.github.io/Kelvinet-Helpdesk/`
 
 ---
 
@@ -77,7 +77,7 @@ The browser never sees the AI key. Users only ever receive **approved** Knowledg
 |---|---|
 | Front end | HTML5, CSS3, vanilla JavaScript (ES modules) |
 | Auth & database | Firebase Authentication, Cloud Firestore |
-| AI proxy | Cloudflare Workers (free plan, no card needed) |
+| AI proxy | Cloudflare Workers (free plan) |
 | AI | Google Gemini (default model `gemini-3.5-flash-lite`) **or** Anthropic Claude |
 | Email | EmailJS |
 | Hosting | GitHub Pages |
@@ -89,9 +89,8 @@ The browser never sees the AI key. Users only ever receive **approved** Knowledg
 ```
 ├── index.html              # App shell: auth, chat, tickets, dashboard, Knowledge Base
 ├── chatbot.css             # Styles (dark/light themes, responsive)
-├── logo.png                # Platform logo:
+├── logo.png                # Your logo: replaces the robot icon and is the tab icon
 ├── chatbot.js              # App logic: auth, tickets, chat, feedback, resolve flow
-├── founder-profile.js      # Approved founder biography, expertise, projects and company context
 ├── kb-engine.js            # Pure retrieval / scoring / redaction / gap-grouping logic
 ├── kb-seed.js              # 25 professional starter articles
 ├── firestore.rules         # Firestore security rules (publish in the Firebase console)
@@ -101,8 +100,6 @@ The browser never sees the AI key. Users only ever receive **approved** Knowledg
 ```
 
 `kb-engine.js` has no browser or Firebase dependencies, so it can be unit-tested in Node.
-
-**Founder profile:** `founder-profile.js` contains the approved professional information used by the AI assistant when users ask about Kelvin Mwichwiri Gitonga or Kelvinet Technologies. Update this file when verified biography, project or company information changes. The file is imported by `chatbot.js`; do not remove it unless you also remove that import and the related prompt references.
 
 **Branding:** if `logo.png` is present it replaces the robot icon in the chat header, bot messages and typing indicator, and becomes the browser-tab icon. If it is missing the robot icon is used. Change `LOGO_URL` in the `CONFIG` block of `chatbot.js` to use a different file name.
 
@@ -127,9 +124,13 @@ flowchart LR
 ```
 
 1. **Retrieve before answering.** Each question is matched against *approved* articles (stemming, synonyms, title and tag weighting, plus a boost or penalty from past votes). The best three go to the AI with the instruction to rely on them and not to invent company-specific steps. If nothing matches, the AI is told so and offers a ticket. Short follow-ups such as "still not working" reuse the previous answer's articles.
+
 2. **Feedback.** 👍 / 👎 under every answer. Votes are stored on the articles that grounded the answer.
+
 3. **Human in the loop.** AI-written articles start as **Draft** and are invisible to users (enforced by Firestore rules). Only an engineer's **Approve** makes one live.
+
 4. **Article scoring.** Articles with at least 3 votes and under 50% helpful are flagged on the dashboard.
+
 5. **Knowledge gaps.** Questions with no matching article, 👎 answers, and questions that ended in a ticket are grouped on the dashboard. **Write article** opens the editor with the question and a standard template; saving closes the gap.
 
 All logs are redacted (emails, phone numbers, long numbers, `password is …`) before they are stored.
@@ -150,13 +151,109 @@ A resolved ticket can be reopened from its detail view. Users can view only thei
 
 ---
 
+## 🔐 Session security and inactivity protection
+
+Kelvinet Smart IT Helpdesk includes an automatic inactivity protection mechanism to reduce the risk of unattended authenticated sessions.
+
+- 30-minute inactivity limit: An inactive session is automatically signed out after 30 minutes.
+- 28-minute warning: The application displays a session-expiry warning two minutes before the inactivity limit.
+- Countdown: A visible two-minute countdown informs the user how much time remains.
+- Continue Session: The user can explicitly extend the session before the countdown expires.
+- Sign Out Now: The user can manually end the session from the warning dialog.
+- Activity monitoring: Normal application interactions reset the inactivity timer before the warning appears.
+
+The inactivity monitor is managed by the application alongside Firebase Authentication. It does not replace Firebase authentication or Firestore Security Rules.
+
+## 💬 Persistent conversations and chat history
+
+Users can save their support conversations and return to them later.
+
+Features include:
+
+- Conversations are stored in Cloud Firestore under the authenticated user's account.
+- Users can open their saved conversation history.
+- Search helps locate previous conversations.
+- Recent conversations can automatically resume within a 24-hour window.
+- Conversations roll over into a new record after 200 messages.
+- Users can delete individual conversations or clear all saved conversations.
+- Users can disable chat saving through Profile → Preferences.
+- Existing saved conversations remain available until explicitly deleted, even when chat saving is disabled for new messages.
+
+Chat history is intended to remain private to the authenticated account, subject to the deployed Firestore Security Rules.
+
+# # 👤 Profile and account preferences
+
+Every authenticated user has access to a personal profile and preferences page.
+
+**Profile management**
+
+- Update full name.
+- Add or update job title.
+- Add or update department.
+- Update contact phone number.
+- View account email and assigned role.
+
+**Password management**
+
+- Change the current password after reauthentication.
+- Request a password-reset email when the current password is unavailable.
+
+**Application preferences**
+
+- Choose dark mode, light mode or device theme.
+- Enable or disable Enter-to-send.
+- Enable or disable conversation saving.
+- Enable or disable daily proactive tips.
+- Enable or disable ticket confirmation emails.
+- Configure a preferred contact email for tickets.
+
+**Personal data**
+
+- Export profile information, preferences, tickets and conversations.
+- Open saved chat history.
+- Permanently delete saved conversations.
+
+# # 🎫 Expanded ticket resolution workflow
+
+Engineers and administrators can record a structured resolution when closing a support ticket.
+
+The resolution form supports:
+
+- Resolution summary (required, minimum 15 characters).
+- Troubleshooting and repair steps performed.
+- Instructions explaining how the user can verify the fix.
+- Prevention recommendations.
+- Internal root cause (staff only).
+- Optional creation of a draft Knowledge Base article.
+
+Once resolved, the ticket records the resolution details, the staff member responsible and the resolution timestamp.
+
+Users can view the resolution information from their ticket details. Internal root-cause information is reserved for staff.
+
+An optional resolution email notification can also be sent using a separate EmailJS template. Email delivery failure does not reverse a successfully recorded ticket resolution.
+
+# # 📱 Responsive interface and accessibility
+
+The application includes responsive layouts for desktop, tablet and mobile devices.
+
+Interface improvements include:
+
+- Mobile-friendly ticket and resolution dialogs.
+- Responsive profile and preferences layouts.
+- Improved handling of long technical messages, filenames and URLs.
+- Mobile safe-area spacing.
+- Reduced-motion support for users who prefer fewer animations.
+- Keyboard-visible focus indicators and accessible interface labels.
+
+---
+
 ## 🚀 Getting started
 
 ### 1. Firebase
 
 1. Create a project at the [Firebase console](https://console.firebase.google.com) (the free **Spark** plan is enough).
 2. **Authentication → Sign-in method →** enable **Email/Password**.
-3. **Authentication → Settings → Authorized domains →** add `YOUR-USERNAME.github.io`.
+3. **Authentication → Settings → Authorized domains →** add every domain you host on, for example `YOUR-USERNAME.github.io` and `YOUR-APP.vercel.app`.
 4. **Firestore Database → Create database** (production mode).
 5. **Firestore → Rules →** paste the contents of `firestore.rules` and **Publish**. Republish whenever this file changes: it also protects the `kb`, `feedback` and `gaps` collections.
 6. **Project settings → Your apps → Web app (`</>`)** → copy the `firebaseConfig` into `chatbot.js`.
@@ -176,16 +273,48 @@ A resolved ticket can be reopened from its detail view. Users can view only thei
 | `GEMINI_MODEL` | Text | optional, default `gemini-3.5-flash-lite` |
 | `GEMINI_THINKING_LEVEL` | Text | optional: `minimal`, `low`, `medium` or `high` |
 | `ANTHROPIC_API_KEY` | **Secret** | only if you use Claude instead |
-| `ALLOWED_ORIGINS` | Text | `https://YOUR-USERNAME.github.io,http://localhost:5500` |
+| `ALLOWED_ORIGINS` | Text | every address your site is served from, comma-separated: `https://YOUR-USERNAME.github.io,https://YOUR-APP.vercel.app,http://localhost:5500` |
+
+> **`ALLOWED_ORIGINS` rules.** Use the address only (scheme + host): no path, no repo name. Open your site and run `location.origin` in the browser console to get the exact text. Vercel creates a new address for every preview deployment; to allow those, add a wildcard for your project only, such as `https://YOUR-APP-*.vercel.app` (the `*` matches one hostname part: letters, digits and hyphens). Never use a bare `https://*.vercel.app`, which would trust every Vercel project. Add each address to the list and click **Deploy** in Cloudflare.
 
 > **Model names change.** Google retires models regularly — `gemini-2.5-*` is now closed to new accounts and returns a 404. If the AI ever stops working, check the [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) and update `GEMINI_MODEL`; no code change is needed.
 
 5. Open your Worker URL in a browser. You should see `{"status":"ok", …}` with `firebaseProjectIdSet` and `providerKeySet` both `true`.
 6. In `chatbot.js`, set `AI_PROXY_URL` to your Worker URL.
 
-### 3. Email notifications (optional)
+### 3. Email notifications (EmailJS)
 
-Create a free [EmailJS](https://www.emailjs.com) account, add an email service and a template using these variables: `to_email`, `to_name`, `ticket_id`, `ticket_title`, `ticket_desc`, `ticket_priority`, `ticket_category`, `ticket_status`, `created_at`, `company_name`, `support_email`. Put the Service ID, Template ID and Public Key in the `CONFIG` block of `chatbot.js`.
+EmailJS handles optional email notifications without requiring a separate application email server.
+
+Create an EmailJS account, configure an email service and create the following templates.
+
+**A. Ticket creation template*
+
+Used to notify the relevant contact when a support ticket is created.
+
+Required template variables:
+
+"to_email", "to_name", "ticket_id", "ticket_title", "ticket_desc", "ticket_priority", "ticket_category", "ticket_status", "created_at", "company_name", "support_email".
+
+**B. Ticket resolution template**
+
+Used to notify the ticket owner when an engineer resolves a ticket.
+
+Template variables:
+
+"to_email", "to_name", "ticket_id", "ticket_title", "ticket_desc", "ticket_status", "resolution", "resolution_steps", "user_instructions", "prevention_tips", "resolved_by", "resolved_at", "support_email", "company_name", "website_url".
+
+Add the EmailJS Service ID, ticket-creation Template ID and Public Key to the "CONFIG" block in "chatbot.js".
+
+The resolution template ID is configured separately using:
+
+"EMAILJS_RESOLUTION_TEMPLATE_ID"
+
+Replace its placeholder with the actual EmailJS template ID after creating the resolution template.
+
+Users can control ticket-creation confirmation emails through Profile → Preferences. Resolution notifications use the separate resolution template configuration.
+
+EmailJS public keys are designed to be exposed in browser applications. Restrict their allowed origins through the EmailJS dashboard.
 
 ### 4. Firestore index
 
@@ -223,7 +352,7 @@ The "AI unavailable" banner now states the reason:
 | Message | Fix |
 |---|---|
 | `AI_PROXY_URL is not set` | Put your Worker URL in `chatbot.js`. |
-| `cannot reach the AI proxy` | Wrong Worker URL, or `ALLOWED_ORIGINS` doesn't include your site's origin (`https://name.github.io`, no repo path needed). |
+| `cannot reach the AI proxy` | Wrong Worker URL, or `ALLOWED_ORIGINS` doesn't include the address you're on. The message now prints that exact address: add it to `ALLOWED_ORIGINS` in Cloudflare and click **Deploy**. Hosting on Vercel? Add the `https://YOUR-APP.vercel.app` address too. |
 | `Invalid or expired login` `[HTTP 401]` | `FIREBASE_PROJECT_ID` is wrong or missing in the Worker. |
 | `Server misconfiguration …` `[HTTP 500]` | A Worker variable is missing; open the Worker URL to see which one. |
 | `Gemini 404 … Model "…" is unavailable` `[HTTP 502]` | The model was retired. Set `GEMINI_MODEL` to `gemini-3.5-flash-lite` (or delete the variable to use the default). |

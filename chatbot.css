@@ -48,8 +48,15 @@ body.light {
 
 /* ── RESET ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 html, body { height: 100%; }
-body { background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+body { 
+  background: var(--bg); 
+  color: var(--text); 
+  min-height: 100vh; 
+  overflow-x: hidden; 
+}
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -215,14 +222,33 @@ h4 { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spa
 }
 
 .topnav-brand {
-  display: flex; align-items: center; gap: 10px; margin-right: 28px;
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+  margin-right: 28px;
 }
-.brand-icon {
-  width: 32px; height: 32px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border-radius: 8px; display: flex; align-items: center; justify-content: center;
-  color: #000; font-size: 14px;
+
+.topnav-brand a {
+  text-decoration: none;
 }
+
+.topnav-brand .brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.topnav-brand .brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .brand-name {
   font-family: 'Space Mono', monospace; font-weight: 700;
   font-size: 1rem; color: var(--text); white-space: nowrap;
@@ -1022,7 +1048,6 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); }
   .gap-q { white-space: normal; }
 }
 
-
 /* ═══════════════════════════════════════════════════
    LOGO — replaces the robot icon when logo.png exists
    (applied by applyLogo() in chatbot.js, which adds .has-logo)
@@ -1042,3 +1067,100 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); }
 .has-logo .msg-row.bot .msg-avatar { padding: 3px; }
 .has-logo .bot-orb > i,
 .has-logo .msg-row.bot .msg-avatar > i { display: none; }   /* hide the robot glyph */
+
+/* ═══════════════════════════════════════════════════
+   USER MANAGEMENT
+═══════════════════════════════════════════════════ */
+#userStats { margin-bottom: 16px; }
+.users-note { margin-top: 12px; }
+.you-tag {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  background: rgba(0,168,255,0.15); color: var(--accent2); padding: 1px 6px; border-radius: 4px; margin-left: 4px;
+}
+tr.row-disabled td { opacity: 0.55; }
+tr.row-disabled td:last-child { opacity: 1; }
+.user-name-btn { font-weight: 600; font-size: 13px; text-decoration: none; color: var(--text); padding: 0; }
+.user-name-btn:hover { color: var(--accent); text-decoration: underline; }
+.action-btn.danger { color: var(--danger); border-color: rgba(255,92,92,0.4); }
+.action-btn.danger:hover { background: rgba(255,92,92,0.12); border-color: var(--danger); }
+.ud-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.ud-avatar { width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; }
+.ud-name { font-weight: 700; font-size: 1.05rem; }
+.ud-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ud-tickets { margin-top: 6px; }
+
+/* ═══════════════════════════════════════════════════
+   PROFILE PAGE + CHAT HISTORY
+═══════════════════════════════════════════════════ */
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+.profile-static { display: flex; align-items: center; gap: 10px; min-height: 38px; }
+.card-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 16px; }
+input[readonly] { opacity: 0.7; cursor: not-allowed; }
+.pw-meter { height: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+.pw-bar { height: 100%; width: 0; border-radius: 99px; transition: width 0.25s, background 0.25s; background: var(--danger); }
+.pw-bar[data-level="2"] { background: var(--warning); }
+.pw-bar[data-level="3"] { background: var(--accent2); }
+.pw-bar[data-level="4"] { background: var(--success); }
+.saved-note { font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--success); margin-left: 8px; }
+.pref-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.pref-row:last-child { border-bottom: none; }
+.pref-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pref-row strong { font-size: 14px; }
+.pref-row span { font-size: 12px; color: var(--text3); line-height: 1.4; }
+.pref-row select, .pref-row input[type="email"] { width: auto; max-width: 190px; flex-shrink: 0; }
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.slider { position: absolute; inset: 0; background: var(--border2); border-radius: 99px; cursor: pointer; transition: background 0.2s; }
+.slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+.switch input:checked + .slider { background: var(--accent); }
+.switch input:checked + .slider::before { transform: translateX(20px); }
+.switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+.danger-btn { color: var(--danger); border-color: rgba(255,92,92,0.4); }
+.danger-btn:hover { background: rgba(255,92,92,0.12); }
+.chat-item.current { border-color: var(--accent); }
+.user-pill:hover { border-color: var(--accent); }
+@media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; } .pref-row select, .pref-row input[type="email"] { max-width: 150px; } }
+
+
+/* ═══════════════════════════════════════════════════
+   RESOLUTION FORM, SESSION WARNING & MOBILE REFINEMENTS
+═══════════════════════════════════════════════════ */
+.resolve-extra-fields { display: grid; gap: 14px; margin-top: 14px; }
+.resolve-extra-field { min-width: 0; }
+.resolve-extra-field textarea { width: 100%; min-height: 88px; resize: vertical; }
+#resolveBackdrop .modal-body, #resolveBackdrop [role="dialog"] { overscroll-behavior: contain; }
+#resolveBackdrop .resolve-summary { overflow-wrap: anywhere; }
+.session-warning-backdrop { z-index: 1200; }
+.session-warning-modal { max-width: 440px; }
+#sessionCountdown { color: var(--danger); font-family: 'Space Mono', monospace; font-size: 1.15em; }
+.session-warning-modal .modal-body p + p { margin-top: 10px; }
+
+/* Prevent long technical strings, URLs and filenames from widening panels. */
+.msg-bubble, .msg-text, .detail-desc p, .gap-q, .kb-card, .ticket-table td {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+textarea, input, select, button { font: inherit; }
+button, input, textarea, select { touch-action: manipulation; }
+
+/* Use the dynamic viewport on modern mobile browsers while retaining fallback. */
+.auth-screen { min-height: 100vh; min-height: 100dvh; }
+.main-content { min-height: 0; }
+
+@media (max-width: 700px) {
+  .modal-backdrop { align-items: flex-end; padding: 0; }
+  .modal, .modal-lg { width: 100%; max-width: none; max-height: 92vh; max-height: 92dvh; border-radius: 16px 16px 0 0; }
+  .modal-header { padding: 15px 18px; }
+  .modal-body { padding: 16px 18px; }
+  .modal-footer { padding: 13px 18px calc(13px + env(safe-area-inset-bottom)); }
+  .session-warning-backdrop { align-items: center; padding: 16px; }
+  .session-warning-modal { width: 100%; max-width: 440px; border-radius: var(--radius-lg); }
+  .pref-row { align-items: flex-start; flex-wrap: wrap; }
+  .pref-row > div { flex: 1 1 180px; }
+  .pref-row select, .pref-row input[type="email"] { max-width: 100%; }
+  .topnav { padding-top: env(safe-area-inset-top); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Kelvinet Smart IT Helpdesk</title>
+  <meta name="theme-color" content="#0d1117">
+  <meta name="description" content="Kelvinet Smart IT Helpdesk — AI-powered IT support, ticket management and technical assistance by Kelvinet Technologies.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -103,9 +105,14 @@
   <!-- TOP NAV -->
   <nav class="topnav" role="navigation" aria-label="Main navigation">
     <div class="topnav-brand">
-      <span class="brand-icon"><i class="fas fa-shield-halved"></i></span>
-      <span class="brand-name">Kelvinet <span class="brand-accent">Helpdesk</span></span>
+      <a href="index.html">
+        <span class="brand-icon">
+          <img src="logo.png" class="brand-logo" alt="Kelvinet Helpdesk Logo">
+        </span>
+        <span class="brand-name">Kelvinet <span class="brand-accent">Helpdesk</span></span>
+      </a>
     </div>
+    
     <div class="topnav-tabs" id="navTabs" role="tablist">
       <button class="nav-tab active" data-view="chat" role="tab" aria-selected="true">
         <i class="fas fa-comments"></i> <span class="tab-label">Support Chat</span>
@@ -128,7 +135,7 @@
       <button class="icon-btn" id="darkToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
         <i class="fas fa-moon"></i>
       </button>
-      <div class="user-pill">
+      <div class="user-pill" id="userPill" role="button" tabindex="0" title="My profile &amp; settings" style="cursor:pointer;">
         <div class="user-avatar" id="userAvatar">?</div>
         <div class="user-info">
           <span class="user-name" id="userDisplayName">Loading…</span>
@@ -169,7 +176,8 @@
             </div>
             <div class="chat-header-right">
               <span class="support-hours"><i class="fas fa-clock"></i> 24/7 Support</span>
-              <button class="icon-btn" id="clearChatBtn" title="Clear chat"><i class="fas fa-broom"></i></button>
+              <button class="icon-btn" id="historyBtn" title="Chat history" aria-label="Chat history"><i class="fas fa-clock-rotate-left"></i></button>
+              <button class="icon-btn" id="clearChatBtn" title="Start a new chat" aria-label="Start a new chat"><i class="fas fa-pen-to-square"></i></button>
             </div>
           </div>
           <div class="messages" id="messages" role="log" aria-live="polite" tabindex="0"></div>
@@ -181,7 +189,7 @@
                 <i class="fas fa-paperclip"></i>
                 <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.log" style="display:none;">
               </label>
-              <textarea id="messageInput" placeholder="Describe your issue or ask a question…" rows="1" maxlength="2000"></textarea>
+              <textarea id="messageInput" placeholder="Describe your issue or ask a question…" rows="1" maxlength="2000" aria-label="Type your IT support message"></textarea>
               <button class="send-btn" id="sendBtn" aria-label="Send message"><i class="fas fa-paper-plane"></i></button>
             </div>
             <div class="composer-hint">Enter to send • Shift+Enter for new line • <span id="charCount">0</span>/2000</div>
@@ -346,16 +354,90 @@
       <div class="view-header">
         <h2><i class="fas fa-users"></i> User Management</h2>
         <div class="view-header-actions">
-          <div class="search-box"><i class="fas fa-search"></i><input id="userSearch" type="text" placeholder="Search users…"></div>
+          <div class="search-box"><i class="fas fa-search"></i><input id="userSearch" type="text" placeholder="Search name or email…"></div>
+          <select id="userRoleFilter" aria-label="Filter by role">
+            <option value="">All roles</option><option value="user">Users</option><option value="engineer">Engineers</option><option value="admin">Admins</option>
+          </select>
+          <select id="userStatusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option><option value="active">Active</option><option value="disabled">Disabled</option>
+          </select>
+          <button class="btn btn-ghost" id="exportUsersBtn"><i class="fas fa-download"></i> Export CSV</button>
         </div>
+      </div>
+      <div class="learn-stats" id="userStats">
+        <div class="learn-stat"><strong id="usTotal">0</strong><span>Total accounts</span></div>
+        <div class="learn-stat"><strong id="usAdmins">0</strong><span>Admins</span></div>
+        <div class="learn-stat"><strong id="usEngineers">0</strong><span>Engineers</span></div>
+        <div class="learn-stat"><strong id="usUsers">0</strong><span>Users</span></div>
+        <div class="learn-stat"><strong id="usDisabled">0</strong><span>Disabled</span></div>
       </div>
       <div class="ticket-table-wrap">
         <table class="ticket-table">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Tickets</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last active</th><th>Tickets</th><th>Actions</th></tr></thead>
           <tbody id="usersTableBody"></tbody>
         </table>
-        <div id="usersEmpty" class="empty-state" style="display:none;"><i class="fas fa-users"></i><p>No users found.</p></div>
+        <div id="usersEmpty" class="empty-state" style="display:none;"><i class="fas fa-users"></i><p>No users match.</p></div>
         <div id="usersLoading" class="empty-state"><i class="fas fa-circle-notch fa-spin" style="color:var(--accent)"></i><p>Loading users…</p></div>
+      </div>
+      <p class="field-hint users-note"><i class="fas fa-circle-info"></i> People sign up themselves and start as <strong>Users</strong>; promote them here. A <strong>disabled</strong> account is locked out of everything, including the AI, immediately. To erase someone's sign-in completely, also delete them under Authentication in the Firebase console.</p>
+    </div>
+
+    <!-- ─── PROFILE VIEW ─── -->
+    <div class="view" id="view-profile">
+      <div class="view-header"><h2><i class="fas fa-user-circle"></i> My Profile</h2></div>
+      <div class="profile-grid">
+
+        <section class="dash-card">
+          <h4><i class="fas fa-id-badge"></i> Account details</h4>
+          <div class="form-grid">
+            <div class="form-row form-row-full"><label for="profName">Full name <span class="req">*</span></label><input id="profName" type="text" maxlength="60" autocomplete="name"></div>
+            <div class="form-row"><label for="profEmail">Email</label><input id="profEmail" type="email" readonly></div>
+            <div class="form-row"><label>Role</label><div class="profile-static"><span id="profRole" class="role-badge user">user</span><span class="muted small">since <span id="profSince">—</span></span></div></div>
+            <div class="form-row"><label for="profJob">Job title</label><input id="profJob" type="text" maxlength="80" autocomplete="organization-title"></div>
+            <div class="form-row"><label for="profDept">Department</label><input id="profDept" type="text" maxlength="80"></div>
+            <div class="form-row form-row-full"><label for="profPhone">Phone</label><input id="profPhone" type="text" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="+254 …"></div>
+          </div>
+          <div class="card-actions"><button class="btn" id="saveProfileBtn"><i class="fas fa-save"></i> Save profile</button></div>
+          <p class="field-hint"><i class="fas fa-circle-info"></i> Your email is your sign-in, so only an administrator can change it.</p>
+        </section>
+
+        <section class="dash-card">
+          <h4><i class="fas fa-key"></i> Change password</h4>
+          <div class="form-grid">
+            <div class="form-row form-row-full"><label for="pwCurrent">Current password</label><input id="pwCurrent" type="password" autocomplete="current-password"></div>
+            <div class="form-row form-row-full"><label for="pwNew">New password</label><input id="pwNew" type="password" autocomplete="new-password" maxlength="128">
+              <div class="pw-meter"><div class="pw-bar" id="pwStrengthBar" data-level="0"></div></div><span class="field-hint" id="pwStrengthLabel"></span></div>
+            <div class="form-row form-row-full"><label for="pwConfirm">Confirm new password</label><input id="pwConfirm" type="password" autocomplete="new-password" maxlength="128"></div>
+          </div>
+          <div class="card-actions"><button class="btn" id="changePwBtn"><i class="fas fa-lock"></i> Change password</button><button class="link-btn" id="pwForgotBtn" type="button">Forgot it? Email me a reset link</button></div>
+        </section>
+
+        <section class="dash-card">
+          <h4><i class="fas fa-sliders"></i> Preferences <span class="saved-note" id="prefSavedNote"></span></h4>
+          <div class="pref-row"><div><strong>Theme</strong><span>Dark, light, or follow your device</span></div>
+            <select id="prefTheme"><option value="dark">Dark</option><option value="light">Light</option><option value="system">Match my device</option></select></div>
+          <div class="pref-row"><div><strong>Press Enter to send</strong><span>Off: Enter adds a new line and Ctrl+Enter sends</span></div>
+            <label class="switch"><input type="checkbox" id="prefEnterSends"><span class="slider"></span></label></div>
+          <div class="pref-row"><div><strong>Save my chats</strong><span>Keep conversations so you can come back to them</span></div>
+            <label class="switch"><input type="checkbox" id="prefSaveChats"><span class="slider"></span></label></div>
+          <div class="pref-row"><div><strong>Show daily tips</strong><span>The tip banner at the top of the app</span></div>
+            <label class="switch"><input type="checkbox" id="prefShowTips"><span class="slider"></span></label></div>
+          <div class="pref-row"><div><strong>Email me ticket confirmations</strong><span>When you create a ticket</span></div>
+            <label class="switch"><input type="checkbox" id="prefEmailConfirm"><span class="slider"></span></label></div>
+          <div class="pref-row"><div><strong>Contact email for tickets</strong><span>Pre-fills new tickets. Empty = your sign-in email</span></div>
+            <input id="prefContactEmail" type="email" maxlength="120" placeholder="optional"></div>
+        </section>
+
+        <section class="dash-card">
+          <h4><i class="fas fa-database"></i> My data</h4>
+          <div class="pref-row"><div><strong>Chat history</strong><span>Private: only you can read your conversations</span></div>
+            <button class="btn btn-ghost" id="profileHistoryBtn"><i class="fas fa-clock-rotate-left"></i> Open</button></div>
+          <div class="pref-row"><div><strong>Download my data</strong><span>Profile, preferences, tickets and chats as a JSON file</span></div>
+            <button class="btn btn-ghost" id="exportMyDataBtn"><i class="fas fa-download"></i> Download</button></div>
+          <div class="pref-row"><div><strong>Delete all saved chats</strong><span>Permanent</span></div>
+            <button class="btn btn-ghost danger-btn" id="profileDeleteChatsBtn"><i class="fas fa-trash"></i> Delete</button></div>
+        </section>
+
       </div>
     </div>
 
@@ -469,16 +551,25 @@
 
 <!-- Resolve Ticket Modal (staff) -->
 <div class="modal-backdrop" id="resolveBackdrop" aria-hidden="true">
-  <div class="modal modal-lg">
+  <div class="modal modal-lg" 
+      role="dialog" 
+      aria-modal="true" 
+      aria-labelledby="resolveModalTitle" 
+      aria-describedby="resolveSummary">
     <div class="modal-header">
-      <h3><i class="fas fa-circle-check"></i> Resolve Ticket <span id="resolveTicketId" class="tid-pill"></span></h3>
-      <button class="modal-close" id="closeResolve"><i class="fas fa-times"></i></button>
+      <h3 id="resolveModalTitle">
+        <i class="fas fa-circle-check"></i> Resolve Ticket 
+        <span id="resolveTicketId" class="tid-pill"></span>
+      </h3>
+      <button class="modal-close" id="closeResolve"><i class="fas fa-times"></i>
+      </button>
     </div>
     <div class="modal-body">
       <div class="resolve-summary" id="resolveSummary"></div>
       <div class="form-grid">
         <div class="form-row form-row-full"><label for="resolveCause">Root cause <span class="muted">(optional)</span></label><input id="resolveCause" type="text" maxlength="200" placeholder="E.g., The print spooler service had stopped"></div>
-        <div class="form-row form-row-full"><label for="resolveText">What fixed it? <span class="req">*</span></label><textarea id="resolveText" rows="5" maxlength="2000" placeholder="Describe the steps you took, in order…"></textarea><span class="field-hint"><i class="fas fa-circle-info"></i> Be specific. The user sees this, and it is used to write the Knowledge Base article.</span></div>
+        <div class="form-row form-row-full">
+          <label for="resolveText">What fixed it? <span class="req">*</span></label><textarea id="resolveText" rows="5" maxlength="2000" placeholder="Describe the steps you took, in order…"></textarea><span class="field-hint"><i class="fas fa-circle-info"></i> Be specific. The user sees this, and it is used to write the Knowledge Base article.</span></div>
         <div class="form-row form-row-full"><label class="check-row"><input type="checkbox" id="resolveMakeKB" checked> Create a <strong>draft</strong> Knowledge Base article from this fix (you review it before the chatbot uses it)</label></div>
       </div>
     </div>
@@ -490,6 +581,39 @@
 </div>
 
 <!-- Change Role Modal (admin only) -->
+<!-- Chat History Modal -->
+<div class="modal-backdrop" id="chatHistoryBackdrop" aria-hidden="true">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-clock-rotate-left"></i> Chat history</h3>
+      <button class="modal-close" id="closeChatHistory"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="search-box" style="margin-bottom:12px;">
+        <i class="fas fa-search"></i>
+        <input id="chatHistorySearch" type="text" placeholder="Search your conversations…" aria-label="Search saved conversations">
+      </div>
+      <div class="gap-list" id="chatHistoryList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost danger-btn" id="deleteAllChatsBtn" style="margin-right:auto;"><i class="fas fa-trash"></i> Delete all</button>
+      <button class="btn btn-ghost" id="closeChatHistory2">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Details Modal (admin) -->
+<div class="modal-backdrop" id="userDetailBackdrop" aria-hidden="true">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-id-card"></i> User details</h3>
+      <button class="modal-close" id="closeUserDetail"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="userDetailBody"></div>
+    <div class="modal-footer"><span id="userDetailActions" class="kb-view-actions"></span><button class="btn btn-ghost" id="closeUserDetail2">Close</button></div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="changeRoleBackdrop" aria-hidden="true">
   <div class="modal" style="max-width:360px;">
     <div class="modal-header">
