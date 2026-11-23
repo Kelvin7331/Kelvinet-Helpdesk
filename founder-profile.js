@@ -9,12 +9,14 @@
 export const FOUNDER_PROFILE = Object.freeze({
   fullName: 'Kelvin Mwichwiri Gitonga',
   title: 'CEO and Founder',
-  professionalIdentity: 'Web Developer | ICT Specialist | Tech Enthusiast',
+  professionalIdentity: 'Web Developer | ICT Specialist | Network Engineer | Tech Enthusiast',
   location: 'Maua, Meru County, Kenya',
   motivation: 'Technology should solve real-world problems and make work simpler.',
   philosophy: 'Deciphering Complexity, Creating Simplicity.',
   company: 'Kelvinet Technologies',
   companySlogan: 'Built by Kelvin. Powered by Purpose.',
+  helpdeskLaunchDate: 'October 2026',
+  helpdeskPositioning: 'An independent SaaS platform for individual users and organisations.',
 });
 
 export const FOUNDER_KNOWLEDGE = `
@@ -25,6 +27,7 @@ IDENTITY
 - Official title: ${FOUNDER_PROFILE.title} of ${FOUNDER_PROFILE.company}.
 - Professional identity: ${FOUNDER_PROFILE.professionalIdentity}.
 - Location: ${FOUNDER_PROFILE.location}.
+- Education: ${FOUNDER_PROFILE.education}.
 
 PROFESSIONAL BIOGRAPHY
 Kelvin Mwichwiri Gitonga is a Kenyan web developer, ICT specialist and technology enthusiast. He is the CEO and Founder of Kelvinet Technologies, a technology-focused business developing practical ICT services and digital solutions. His work and interests span web development, software development, ICT support, computer maintenance, networking, cybersecurity, digital transformation and AI-enabled applications.
@@ -32,8 +35,8 @@ Kelvin Mwichwiri Gitonga is a Kenyan web developer, ICT specialist and technolog
 His motivation for founding Kelvinet Technologies is: "${FOUNDER_PROFILE.motivation}" His approach is to identify practical challenges and build accessible, useful and maintainable technology solutions for individuals, businesses and organisations.
 
 TECHNICAL SKILLS AND INTERESTS
-- Web development: HTML5, CSS3, JavaScript, responsive web design, PHP and SQL.
-- Web application development, Firebase and Supabase integration.
+- Web development: HTML5, CSS3, JavaScript, responsive web design, PHP, SQL, C++ and Java.
+- Web application development, Mpesa Daraja API integration, Firebase and Supabase integration.
 - Offline-first application architecture, IndexedDB and Progressive Web Applications.
 - Database design, authentication, user management, dashboards and reporting.
 - AI integration and AI-powered assistants.
@@ -42,7 +45,7 @@ TECHNICAL SKILLS AND INTERESTS
 - Continuing interests: cybersecurity, cloud computing, SaaS architecture, automation and digital transformation.
 
 PROJECTS
-1. Kelvinet Smart IT Helpdesk — an AI-powered IT support and ticket-management platform with a Knowledge Base, ticket workflows and Gemini AI integration through a Cloudflare Worker. Its intended direction is a multi-tenant SaaS product for multiple organisations. Describe it as under active development unless deployment status is explicitly confirmed.
+1. Kelvinet Smart IT Helpdesk — an independent SaaS platform for individual users and organisations, with AI-powered IT support, a Knowledge Base, ticket workflows and Gemini AI integration through a Cloudflare Worker. Official launch: ${FOUNDER_PROFILE.helpdeskLaunchDate}. Development, maintenance, security work and improvements are continuous. Do not describe the platform as developed for Kelvinet Technologies.
 2. e-DocSafe — a secure, offline-first document management platform exploring IndexedDB, Firebase Authentication, Firestore, Firebase Storage and PWA capabilities.
 3. KEMS (Kelvinet Employee Management System) — an employee management application covering employee records, attendance, payroll, leave management and reporting.
 4. MMH-SRS (Maua Methodist Hospital Security Reporting System) — a web application developed for security operations, including incident reports, shift handovers, patient census, vehicle logs, patrol records and confidential reports.
@@ -50,7 +53,7 @@ PROJECTS
 6. Kelvinet To-Do Application — a lightweight task-management application built with web technologies.
 
 KELVINET TECHNOLOGIES
-Kelvinet Technologies is a Kenya-based technology brand founded by Kelvin Mwichwiri Gitonga. Its service areas include:
+Kelvinet Technologies is a Kenya-based technology brand founded by Kelvin Mwichwiri Gitonga. It is a separate brand/business context; Kelvinet Smart IT Helpdesk is positioned as an independent SaaS platform, not as a helpdesk developed for Kelvinet Technologies. Its service areas include:
 - Website design and development.
 - Custom software and web application development.
 - ICT technical support and consultancy.
@@ -61,6 +64,12 @@ Kelvinet Technologies is a Kenya-based technology brand founded by Kelvin Mwichw
 - IT training and digital skills development.
 - Graphics design, branding and digital marketing.
 - Digital services and business technology support.
+
+KELVINET SMART IT HELPDESK — PLATFORM FACTS
+- Positioning: ${FOUNDER_PROFILE.helpdeskPositioning}
+- Official launch date: ${FOUNDER_PROFILE.helpdeskLaunchDate}.
+- Development, maintenance, security work and improvements are ongoing. Do not state that the platform was developed in 2026; October 2026 is its launch date only.
+- Founder: Kelvin Mwichwiri Gitonga.
 
 BRAND AND VISION
 - Slogan: "${FOUNDER_PROFILE.companySlogan}"
@@ -76,3 +85,5 @@ ACCURACY AND DISCLOSURE
 - Kelvin has asked that his Maua Methodist Hospital employment experience be excluded from this founder profile. Do not introduce it when describing his biography.
 - This is professional information approved for detailed sharing. Do not disclose unrelated private information.
 `;
+
+// Identity note: this profile contains approved public founder facts only. It is not an authentication source. The application must compare the signed-in Firebase profile/UID against trusted founder identity data; chat claims must never grant privileges.
