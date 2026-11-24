@@ -302,3 +302,7 @@ export function articlePreview(content, max = 170) {
   t = t.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').replace(/^\s*(?:[-•*]|\d+\.)\s+/gm, '').replace(/\s+/g, ' ').trim();
   return t.length > max ? t.slice(0, max).replace(/\s+\S*$/, '') + '…' : t;
 }
+
+/* Compatibility export required by the updated chatbot.js.
+   Uses the existing privacy redaction rules to avoid changing KB behaviour. */
+export const redactSecrets = redactSensitive;
