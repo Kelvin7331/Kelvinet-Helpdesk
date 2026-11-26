@@ -1255,3 +1255,257 @@ button, input, textarea, select { touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) {
   .app-sidebar { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE DASHBOARD REFINEMENT
+   Fluid KPI cards, adaptive analytics panels and overflow safety.
+═══════════════════════════════════════════════════════════════ */
+#view-dashboard { min-width: 0; width: 100%; }
+#view-dashboard .view-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px 18px; margin-bottom: 20px;
+}
+#view-dashboard .view-header h2 { min-width: 0; overflow-wrap: anywhere; }
+#view-dashboard .view-header-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  flex-wrap: wrap; gap: 8px;
+}
+#view-dashboard .dash-kpi-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 175px), 1fr));
+  align-items: stretch; gap: 12px;
+}
+#view-dashboard .kpi-card { min-width: 0; padding: clamp(12px, 1.5vw, 18px); }
+#view-dashboard .kpi-body { min-width: 0; }
+#view-dashboard .kpi-value {
+  font-size: clamp(1.35rem, 2vw, 1.8rem); overflow-wrap: anywhere;
+}
+#view-dashboard .kpi-label { line-height: 1.35; overflow-wrap: anywhere; }
+#view-dashboard .dash-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch; gap: 14px;
+}
+#view-dashboard .dash-card {
+  min-width: 0; overflow: hidden; padding: clamp(14px, 1.7vw, 20px);
+}
+#view-dashboard .dash-card h4 {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  line-height: 1.4; overflow-wrap: anywhere; margin-bottom: 14px;
+}
+#view-dashboard .bar-chart,
+#view-dashboard .agent-queue,
+#view-dashboard .gap-list { min-width: 0; max-width: 100%; }
+#view-dashboard .bar-row { min-width: 0; }
+#view-dashboard .bar-label {
+  width: clamp(64px, 9vw, 100px); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+#view-dashboard .bar-value { flex: 0 0 28px; }
+#view-dashboard .activity-feed { min-width: 0; padding: 0; }
+#view-dashboard .activity-item { min-width: 0; flex-wrap: wrap; overflow-wrap: anywhere; }
+#view-dashboard .activity-item .act-time { margin-left: auto; }
+#view-dashboard .resolution-ring { min-height: 160px; }
+#view-dashboard .resolution-ring svg { display: block; max-width: 100%; height: auto; }
+#view-dashboard .ring-label { padding: 0; gap: 4px; text-align: center; }
+#view-dashboard .dash-full { width: 100%; min-width: 0; }
+#view-dashboard .learn-stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+}
+#view-dashboard .learn-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#view-dashboard .learn-cols > div { min-width: 0; }
+#view-dashboard .learn-cols h5 { line-height: 1.4; }
+#view-dashboard .gap-q,
+#view-dashboard .gap-list > *,
+#view-dashboard .agent-queue > * { min-width: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 1500px) {
+  #view-dashboard .dash-kpi-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #view-dashboard .dash-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  #view-dashboard .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view-dashboard .learn-cols { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  #view-dashboard .view-header { align-items: stretch; }
+  #view-dashboard .view-header-actions { justify-content: space-between; width: 100%; }
+  #view-dashboard .dash-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px;
+  }
+  #view-dashboard .kpi-card {
+    gap: 9px; padding: 11px 10px; border-radius: 12px;
+  }
+  #view-dashboard .kpi-icon {
+    width: 34px; height: 34px; font-size: 14px; border-radius: 8px;
+  }
+  #view-dashboard .kpi-value { font-size: 1.25rem; }
+  #view-dashboard .kpi-label { font-size: 11px; }
+  #view-dashboard .dash-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  #view-dashboard .dash-card { padding: 14px; border-radius: 12px; }
+  #view-dashboard .activity-item { align-items: flex-start; }
+  #view-dashboard .activity-item .act-time { flex: 0 0 100%; margin-left: 24px; }
+}
+@media (max-width: 360px) {
+  #view-dashboard .dash-kpi-row { grid-template-columns: minmax(0, 1fr); }
+  #view-dashboard .kpi-card { padding: 12px; }
+  #view-dashboard .view-header-actions { align-items: stretch; }
+  #view-dashboard .view-header-actions .btn { justify-content: center; }
+}
+
+
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE TICKET MANAGEMENT REFINEMENT
+   Adaptive toolbar, statistics and horizontally scrollable table.
+═══════════════════════════════════════════════════════════════ */
+#view-tickets {
+  width: 100%;
+  min-width: 0;
+}
+#view-tickets .view-header {
+  align-items: flex-start;
+  gap: 14px 20px;
+}
+#view-tickets .view-header > h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#view-tickets .view-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+  min-width: 0;
+  max-width: 100%;
+}
+#view-tickets .view-header-actions > * {
+  min-width: 0;
+}
+#view-tickets .search-box {
+  flex: 1 1 210px;
+  min-width: 170px;
+  max-width: 300px;
+}
+#view-tickets .search-box input {
+  width: 100%;
+  min-width: 0;
+}
+#view-tickets .view-header-actions select {
+  flex: 0 1 auto;
+  max-width: 190px;
+  min-height: 40px;
+}
+#view-tickets .view-header-actions .btn {
+  white-space: nowrap;
+  min-height: 40px;
+}
+#view-tickets .ticket-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  min-width: 0;
+}
+#view-tickets .ticket-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+}
+#view-tickets .ticket-table {
+  width: 100%;
+  min-width: 790px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#view-tickets .ticket-table th,
+#view-tickets .ticket-table td {
+  white-space: nowrap;
+}
+#view-tickets .ticket-table td:nth-child(2) {
+  white-space: normal;
+  min-width: 180px;
+  max-width: 300px;
+  overflow-wrap: anywhere;
+}
+#view-tickets .ticket-table td:last-child {
+  min-width: 105px;
+}
+#view-tickets .ticket-table tbody tr {
+  transition: background-color .15s ease;
+}
+#view-tickets .ticket-table tbody tr:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+#view-tickets .empty-state {
+  min-width: 0;
+  padding: 34px 16px;
+  text-align: center;
+}
+@media (max-width: 900px) {
+  #view-tickets .view-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  #view-tickets .search-box {
+    flex: 1 1 230px;
+    max-width: none;
+  }
+}
+@media (max-width: 600px) {
+  #view-tickets .view-header {
+    align-items: stretch;
+  }
+  #view-tickets .view-header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
+  }
+  #view-tickets .view-header-actions .search-box {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+  #view-tickets .view-header-actions select {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  #view-tickets .view-header-actions .btn {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    white-space: normal;
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+  #view-tickets .ticket-stats-bar {
+    gap: 7px 13px;
+    font-size: 12px;
+    padding: 12px 0;
+  }
+  #view-tickets .ticket-table {
+    min-width: 760px;
+    font-size: 12px;
+  }
+  #view-tickets .ticket-table th,
+  #view-tickets .ticket-table td {
+    padding: 10px 11px;
+  }
+  #view-tickets .ticket-table-wrap {
+    border-radius: 12px;
+  }
+}
+@media (max-width: 360px) {
+  #view-tickets .view-header-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #view-tickets .view-header-actions .search-box {
+    grid-column: auto;
+  }
+}
