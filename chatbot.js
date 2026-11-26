@@ -31,7 +31,7 @@ const CONFIG = {
   MAX_FILE_SIZE_MB: 5,
   TYPING_DELAY_MS: 600,
   COMPANY_NAME:    'Kelvinet Technologies',
-  SUPPORT_EMAIL:   'support@kelvinet.co.ke',
+  SUPPORT_EMAIL:   'kelvinettech@gmail.com',
   // The Kelvinet Helpdesk logo loaded here
   LOGO_URL:    'logo.png',
   CHAT_RESUME_HOURS: 24,    // reopen the latest saved chat automatically if it was active within this many hours
@@ -246,7 +246,7 @@ function clearAuthError(formId) {
 
 async function handleLogin() {
   const email = document.getElementById('loginEmail').value.trim();
-  const pw    = document.getElementById('loginPassword').value;
+  const pw = document.getElementById('loginPassword').value;
   clearAuthError('login');
   if (!email || !pw) { showAuthError('login','Please enter your email and password.'); return; }
   const btn = document.getElementById('loginBtn');
@@ -870,9 +870,9 @@ function ensureResolveModal() {
   document.getElementById('confirmResolve').addEventListener('click', confirmResolve);
 }
 
-/* ═══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    💬  CHAT — MESSAGE RENDERING
-═══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 /** Escapes first, then applies a safe subset of inline markdown. */
 function inlineFmt(str) {
   return escapeHtml(str)
@@ -934,16 +934,16 @@ function appendMessage({ from = 'bot', text = '', save = true, imageDataUrl = nu
   return msg;
 }
 
-/* ═══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    👍👎  FEEDBACK  →  ARTICLE SCORES + KNOWLEDGE GAPS
-═══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function buildFeedbackRow(ctx) {
   const row = document.createElement('div'); row.className = 'msg-feedback';
   row.innerHTML =
     '<span class="fb-label">Was this helpful?</span>' +
     '<button type="button" class="fb-btn" data-v="up" title="Helpful" aria-label="Helpful"><i class="fas fa-thumbs-up"></i></button>' +
     '<button type="button" class="fb-btn" data-v="down" title="Not helpful" aria-label="Not helpful"><i class="fas fa-thumbs-down"></i></button>';
-  if (ctx.state) {                                   // a restored conversation: show the rating already given
+  if (ctx.state) {                          // a restored conversation: show the rating already given
     row.dataset.done = '1';
     row.querySelectorAll('.fb-btn').forEach(b => { b.disabled = true; b.classList.toggle('chosen', b.dataset.v === ctx.state); });
     row.querySelector('.fb-label').textContent = ctx.state === 'up' ? 'Thanks for the feedback!' : "Thanks, I've noted this so the team can improve it.";
@@ -2222,7 +2222,48 @@ function closeModal(id) { const el = document.getElementById(id); if (el) { el.c
 /* ═══════════════════════════════════════════════
    🧭  VIEW NAVIGATION
 ═══════════════════════════════════════════════ */
+function closeAppNavigation() {
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('navBackdrop');
+  const toggle = document.getElementById('navMenuToggle');
+  sidebar?.classList.remove('is-open');
+  if (backdrop) backdrop.hidden = true;
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Open navigation menu');
+    const icon = toggle.querySelector('i');
+    if (icon) icon.className = 'fas fa-bars';
+  }
+}
+
+function toggleAppNavigation() {
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('navBackdrop');
+  const toggle = document.getElementById('navMenuToggle');
+  if (!sidebar || !toggle) return;
+
+  if (window.matchMedia('(min-width: 1200px)').matches) {
+    sidebar.classList.toggle('is-collapsed');
+    document.body.classList.toggle('sidebar-collapsed', sidebar.classList.contains('is-collapsed'));
+    const collapsed = sidebar.classList.contains('is-collapsed');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand navigation menu' : 'Collapse navigation menu');
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    const icon = toggle.querySelector('i');
+    if (icon) icon.className = collapsed ? 'fas fa-angles-right' : 'fas fa-bars';
+    return;
+  }
+
+  const open = !sidebar.classList.contains('is-open');
+  sidebar.classList.toggle('is-open', open);
+  if (backdrop) backdrop.hidden = !open;
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+  const icon = toggle.querySelector('i');
+  if (icon) icon.className = open ? 'fas fa-xmark' : 'fas fa-bars';
+}
+
 function switchView(viewId) {
+  closeAppNavigation();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
   const view = document.getElementById(`view-${viewId}`);
@@ -2280,6 +2321,15 @@ function bindAuthEvents() {
 function bindAppEvents() {
   if (appEventsBound) return;   // otherwise every re-login would stack duplicate handlers
   appEventsBound = true;
+  // Responsive application navigation
+  document.getElementById('navMenuToggle')?.addEventListener('click', toggleAppNavigation);
+  document.getElementById('navBackdrop')?.addEventListener('click', closeAppNavigation);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAppNavigation();
+  });
+  window.addEventListener('resize', () => {
+    if (window.matchMedia('(min-width: 1200px)').matches) closeAppNavigation();
+  });
   // Nav tabs
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => switchView(tab.dataset.view));
@@ -2694,7 +2744,7 @@ async function changePassword() {
   } finally { btn.disabled = false; }
 }
 
-function toPlain(v) {                                    // Firestore timestamps -> readable dates
+function toPlain(v) {                       // Firestore timestamps -> readable dates
   if (v && typeof v.toDate === 'function') return v.toDate().toISOString();
   if (Array.isArray(v)) return v.map(toPlain);
   if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toPlain(x)]));

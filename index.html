@@ -3,9 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Kelvinet Smart IT Helpdesk</title>
-  <meta name="theme-color" content="#0d1117">
-  <meta name="description" content="Kelvinet Smart IT Helpdesk — AI-powered IT support, ticket management and technical assistance by Kelvinet Technologies.">
+  
+  <!-- Basic SEO Meta Tags -->
+  <title>Kelvinet Smart IT Helpdesk | AI-Powered IT Support</title>
+  
+  <meta name="description" content="Get instant AI-powered IT support with Kelvinet Smart IT Helpdesk. Troubleshoot computer, software, networking and technical issues, manage support requests and access reliable IT assistance anytime.">
+  
+  <meta name="keywords" content="Kelvinet Smart IT Helpdesk, AI IT support, online IT helpdesk, IT troubleshooting, technical support Kenya, computer support, network troubleshooting, IT service management, AI support assistant">
+  
+  <meta name="author" content="Kelvinet Technologies">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="English">
+  <meta name="revisit-after" content="7 days">
+  
+  <!-- Geographic SEO -->
+  <meta name="geo.region" content="KE">
+  <meta name="geo.placename" content="Kenya">
+  
+  <!-- Canonical URL: The actual production URL -->
+  <link rel="canonical" href="https://kelvinethelpdesk.vercel.app/">
+  
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Kelvinet Smart IT Helpdesk | AI-Powered IT Support">
+  <meta property="og:description" content="Your intelligent IT support assistant. Get help with computer problems, software, networking and technical issues anytime, anywhere.">
+  <meta property="og:url" content="https://kelvinethelpdesk.vercel.app/">
+  <meta property="og:site_name" content="Kelvinet Smart IT Helpdesk">
+  <meta property="og:image" content="https://raw.githubusercontent.com/Kelvin7331/Kelvinet-Helpdesk/main/logo.png">
+  <meta property="og:image:alt" content="Kelvinet Smart IT Helpdesk Logo">
+  
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Kelvinet Smart IT Helpdesk">
+  <meta name="twitter:description" content="AI-powered IT assistance for individuals and organisations. Get reliable technical support whenever you need it.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/Kelvin7331/Kelvinet-Helpdesk/main/logo.png">
+  
+  <!-- Mobile and Theme -->
+  <meta name="theme-color" content="#071426">
+  <meta name="application-name" content="Kelvinet Smart IT Helpdesk">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Kelvinet Helpdesk">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -104,6 +142,10 @@
 
   <!-- TOP NAV -->
   <nav class="topnav" role="navigation" aria-label="Main navigation">
+    <button class="icon-btn nav-menu-toggle" id="navMenuToggle" type="button"
+      aria-label="Open navigation menu" aria-controls="appSidebar" aria-expanded="false">
+      <i class="fas fa-bars"></i>
+    </button>
     <div class="topnav-brand">
       <a href="index.html">
         <span class="brand-icon">
@@ -113,6 +155,26 @@
       </a>
     </div>
     
+    <div class="topnav-actions">
+      <button class="icon-btn" id="darkToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <i class="fas fa-moon"></i>
+      </button>
+      <div class="user-pill" id="userPill" role="button" tabindex="0" title="My profile &amp; settings" style="cursor:pointer;">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-info">
+          <span class="user-name" id="userDisplayName">Loading…</span>
+          <span class="user-role-badge" id="userRoleBadge">user</span>
+        </div>
+        <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out">
+          <i class="fas fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="nav-backdrop" id="navBackdrop" hidden></div>
+  <aside class="app-sidebar" id="appSidebar" aria-label="Application navigation">
+    <div class="sidebar-heading">WORKSPACE</div>
     <div class="topnav-tabs" id="navTabs" role="tablist">
       <button class="nav-tab active" data-view="chat" role="tab" aria-selected="true">
         <i class="fas fa-comments"></i> <span class="tab-label">Support Chat</span>
@@ -131,22 +193,10 @@
         <i class="fas fa-users"></i> <span class="tab-label">Users</span>
       </button>
     </div>
-    <div class="topnav-actions">
-      <button class="icon-btn" id="darkToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
-        <i class="fas fa-moon"></i>
-      </button>
-      <div class="user-pill" id="userPill" role="button" tabindex="0" title="My profile &amp; settings" style="cursor:pointer;">
-        <div class="user-avatar" id="userAvatar">?</div>
-        <div class="user-info">
-          <span class="user-name" id="userDisplayName">Loading…</span>
-          <span class="user-role-badge" id="userRoleBadge">user</span>
-        </div>
-        <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out">
-          <i class="fas fa-right-from-bracket"></i>
-        </button>
-      </div>
+    <div class="sidebar-footer">
+      <span class="sidebar-footer-label">Kelvinet Smart IT Helpdesk</span>
     </div>
-  </nav>
+  </aside>
 
   <!-- PROACTIVE BANNER -->
   <div class="proactive-banner" id="proactiveBanner" style="display:none;">
@@ -175,7 +225,9 @@
               </div>
             </div>
             <div class="chat-header-right">
-              <span class="support-hours"><i class="fas fa-clock"></i> 24/7 Support</span>
+              <span class="support-hours">
+                <i class="fas fa-clock"></i> 24/7 Support
+              </span>
               <button class="icon-btn" id="historyBtn" title="Chat history" aria-label="Chat history"><i class="fas fa-clock-rotate-left"></i></button>
               <button class="icon-btn" id="clearChatBtn" title="Start a new chat" aria-label="Start a new chat"><i class="fas fa-pen-to-square"></i></button>
             </div>
@@ -437,7 +489,6 @@
           <div class="pref-row"><div><strong>Delete all saved chats</strong><span>Permanent</span></div>
             <button class="btn btn-ghost danger-btn" id="profileDeleteChatsBtn"><i class="fas fa-trash"></i> Delete</button></div>
         </section>
-
       </div>
     </div>
 
@@ -491,7 +542,11 @@
           <div id="modalAttachList" class="attach-list"></div>
         </div>
         <div class="form-row form-row-full" id="aiFillRow" style="display:none;">
-          <div class="ai-fill-notice"><i class="fas fa-wand-magic-sparkles"></i><span>AI auto-filled from your conversation.</span><button type="button" class="link-btn" id="clearAiFill">Clear</button></div>
+          <div class="ai-fill-notice">
+            <i class="fas fa-wand-magic-sparkles"></i>
+            <span>AI auto-filled from your conversation.</span>
+            <button type="button" class="link-btn" id="clearAiFill">Clear</button>
+          </div>
         </div>
       </div>
     </div>
@@ -511,11 +566,37 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-row form-row-full"><label for="kbTitle">Title <span class="req">*</span></label><input id="kbTitle" type="text" placeholder="E.g., How to reset your password"></div>
-        <div class="form-row"><label for="kbCategory">Category <span class="req">*</span></label><select id="kbCategory"><option value="hardware">Hardware</option><option value="software">Software</option><option value="network">Network</option><option value="account">Account</option><option value="email">Email</option><option value="security">Security</option><option value="other">Other</option></select></div>
-        <div class="form-row"><label for="kbTags">Tags (comma separated)</label><input id="kbTags" type="text" placeholder="password, login, reset"></div>
-        <div class="form-row form-row-full"><label for="kbStatus">Status</label><select id="kbStatus"><option value="approved">Approved: the chatbot will use this article</option><option value="draft">Draft: hidden from the chatbot until approved</option></select></div>
-        <div class="form-row form-row-full"><label for="kbContent">Content <span class="req">*</span></label><textarea id="kbContent" rows="8" placeholder="Use ## Summary, ## Steps (1. 2. 3.) and ## Escalate to IT if… Supports **bold** and - bullets."></textarea></div>
+        <div class="form-row form-row-full">
+          <label for="kbTitle">Title <span class="req">*</span></label>
+          <input id="kbTitle" type="text" placeholder="E.g., How to reset your password">
+        </div>
+        <div class="form-row">
+          <label for="kbCategory">Category <span class="req">*</span></label>
+          <select id="kbCategory">
+            <option value="hardware">Hardware</option>
+            <option value="software">Software</option>
+            <option value="network">Network</option>
+            <option value="account">Account</option>
+            <option value="email">Email</option>
+            <option value="security">Security</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="kbTags">Tags (comma separated)</label>
+          <input id="kbTags" type="text" placeholder="password, login, reset">
+        </div>
+        <div class="form-row form-row-full">
+          <label for="kbStatus">Status</label>
+          <select id="kbStatus">
+            <option value="approved">Approved: the chatbot will use this article</option>
+            <option value="draft">Draft: hidden from the chatbot until approved</option>
+          </select>
+        </div>
+        <div class="form-row form-row-full">
+          <label for="kbContent">Content <span class="req">*</span></label>
+          <textarea id="kbContent" rows="8" placeholder="Use ## Summary, ## Steps (1. 2. 3.) and ## Escalate to IT if… Supports **bold** and - bullets."></textarea>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -533,7 +614,9 @@
       <button class="modal-close" id="closeTicketDetail"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body" id="ticketDetailBody"></div>
-    <div class="modal-footer"><button class="btn btn-ghost" id="closeTicketDetail2">Close</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="closeTicketDetail2">Close</button>
+    </div>
   </div>
 </div>
 
@@ -542,10 +625,15 @@
   <div class="modal modal-lg">
     <div class="modal-header">
       <h3><i class="fas fa-book-open"></i> <span id="kbViewTitle">Article</span></h3>
-      <button class="modal-close" id="closeKbView"><i class="fas fa-times"></i></button>
+      <button class="modal-close" id="closeKbView">
+        <i class="fas fa-times"></i>
+      </button>
     </div>
     <div class="modal-body" id="kbViewBody"></div>
-    <div class="modal-footer"><span id="kbViewActions" class="kb-view-actions"></span><button class="btn btn-ghost" id="closeKbView2">Close</button></div>
+    <div class="modal-footer">
+      <span id="kbViewActions" class="kb-view-actions"></span>
+      <button class="btn btn-ghost" id="closeKbView2">Close</button>
+    </div>
   </div>
 </div>
 
@@ -567,10 +655,18 @@
     <div class="modal-body">
       <div class="resolve-summary" id="resolveSummary"></div>
       <div class="form-grid">
-        <div class="form-row form-row-full"><label for="resolveCause">Root cause <span class="muted">(optional)</span></label><input id="resolveCause" type="text" maxlength="200" placeholder="E.g., The print spooler service had stopped"></div>
         <div class="form-row form-row-full">
-          <label for="resolveText">What fixed it? <span class="req">*</span></label><textarea id="resolveText" rows="5" maxlength="2000" placeholder="Describe the steps you took, in order…"></textarea><span class="field-hint"><i class="fas fa-circle-info"></i> Be specific. The user sees this, and it is used to write the Knowledge Base article.</span></div>
-        <div class="form-row form-row-full"><label class="check-row"><input type="checkbox" id="resolveMakeKB" checked> Create a <strong>draft</strong> Knowledge Base article from this fix (you review it before the chatbot uses it)</label></div>
+          <label for="resolveCause">Root cause <span class="muted">(optional)</span></label>
+          <input id="resolveCause" type="text" maxlength="200" placeholder="E.g., The print spooler service had stopped">
+        </div>
+        <div class="form-row form-row-full">
+          <label for="resolveText">What fixed it? <span class="req">*</span></label>
+          <textarea id="resolveText" rows="5" maxlength="2000" placeholder="Describe the steps you took, in order…"></textarea>
+          <span class="field-hint"><i class="fas fa-circle-info"></i> Be specific. The user sees this, and it is used to write the Knowledge Base article.</span>
+        </div>
+        <div class="form-row form-row-full">
+          <label class="check-row"><input type="checkbox" id="resolveMakeKB" checked> Create a <strong>draft</strong> Knowledge Base article from this fix (you review it before the chatbot uses it)</label>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -580,7 +676,6 @@
   </div>
 </div>
 
-<!-- Change Role Modal (admin only) -->
 <!-- Chat History Modal -->
 <div class="modal-backdrop" id="chatHistoryBackdrop" aria-hidden="true">
   <div class="modal modal-lg">
@@ -614,6 +709,7 @@
   </div>
 </div>
 
+<!-- Change Role Modal (admin only) -->
 <div class="modal-backdrop" id="changeRoleBackdrop" aria-hidden="true">
   <div class="modal" style="max-width:360px;">
     <div class="modal-header">
