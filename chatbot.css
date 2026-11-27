@@ -2153,3 +2153,157 @@ button, input, textarea, select { touch-action: manipulation; }
   }
   #resolveBackdrop .modal-footer .btn { min-height: 44px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STAGE 8 — FINAL RESPONSIVE AUDIT & CROSS-SCREEN HARDENING
+   Shared safeguards for every role, view, form, table and modal.
+═══════════════════════════════════════════════════════════════ */
+:root { --app-safe-inline: max(12px, env(safe-area-inset-left)); }
+html { min-width: 320px; scroll-padding-top: 72px; }
+body, #app, .app-shell, .main-content, .view, .dash-card,
+.chat-layout, .chat-panel, .chat-sidebar, .ticket-toolbar,
+.kb-toolbar, .users-toolbar, .profile-grid { min-width: 0; }
+img, video, canvas, svg { max-width: 100%; }
+pre, code, .mono, .tid-pill, .ticket-id { overflow-wrap: anywhere; }
+.view-header > *, .view-header-actions > *, .toolbar > *,
+.ticket-toolbar > *, .kb-toolbar > *, .users-toolbar > * { min-width: 0; }
+.view-header-actions, .toolbar, .ticket-toolbar, .kb-toolbar,
+.users-toolbar, .card-actions { flex-wrap: wrap; }
+
+/* All static and dynamically-created dialogs share the same safe geometry. */
+.modal-backdrop {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-backdrop > .modal,
+.modal-backdrop > [role="dialog"] {
+  min-width: 0;
+  width: min(100%, 640px);
+  max-width: calc(100vw - 32px);
+  max-height: min(90vh, 900px);
+  max-height: min(90dvh, 900px);
+  overflow: hidden;
+}
+.modal-header, .modal-body, .modal-footer { min-width: 0; }
+.modal-header { gap: 12px; }
+.modal-header h2, .modal-header h3,
+.modal-header .modal-title { min-width: 0; overflow-wrap: anywhere; }
+.modal-close { flex: 0 0 auto; min-width: 40px; min-height: 40px; }
+.modal-body {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-body .form-grid,
+.modal-body .detail-grid { min-width: 0; }
+.modal-body .form-row,
+.modal-body .detail-field { min-width: 0; }
+.modal-body input:not([type="checkbox"]):not([type="radio"]),
+.modal-body textarea, .modal-body select { min-width: 0; max-width: 100%; }
+.modal-body textarea { overflow-wrap: anywhere; }
+.modal-footer { flex-wrap: wrap; }
+.modal-footer .btn, .modal-footer button { min-height: 42px; }
+
+/* Prevent wide data tables from forcing the entire page beyond the viewport. */
+.ticket-table-wrap, .table-wrap, .table-responsive,
+#view-tickets .table-container, #view-users .table-container {
+  max-width: 100%; min-width: 0; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ticket-table { max-width: 100%; }
+.ticket-table th, .ticket-table td { overflow-wrap: anywhere; }
+
+/* Authentication and compact devices. */
+.auth-screen { width: 100%; padding: clamp(12px, 4vw, 24px); }
+.auth-card { min-width: 0; }
+.remote-support-row { flex-wrap: wrap; }
+.remote-support-row input { min-width: 0; }
+
+/* Long AI responses, generated code and article content. */
+.msg-row, .msg-bubble, .msg-text, .kb-article-content,
+.article-content, .detail-desc, .resolve-summary { min-width: 0; }
+.msg-bubble { overflow-wrap: anywhere; }
+.msg-text pre, .kb-article-content pre, .article-content pre,
+.msg-text table, .kb-article-content table, .article-content table {
+  display: block; max-width: 100%; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Toasts and banners must remain inside the visible viewport. */
+#toastContainer { max-width: min(420px, calc(100vw - 32px)); }
+#toastContainer > * { min-width: 0; overflow-wrap: anywhere; }
+#proactiveBanner { min-width: 0; max-width: 100%; }
+
+@media (max-width: 900px) {
+  .detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .chat-layout { grid-template-columns: minmax(0, 1fr); }
+  .chat-panel { min-width: 0; }
+  .view-header-actions { width: 100%; margin-left: 0; }
+}
+
+@media (max-width: 700px) {
+  html, body { width: 100%; min-width: 320px; }
+  .main-content { width: 100%; padding: 12px; }
+  .view-header { gap: 10px; }
+  .view-header h2 { font-size: 1.12rem; }
+  .view-header-actions { gap: 8px; }
+  .view-header-actions > .btn,
+  .view-header-actions > button { min-height: 40px; }
+  .auth-card { padding: 22px 16px; }
+  .auth-brand h1 { font-size: 1.2rem; overflow-wrap: anywhere; }
+  .chat-layout { height: auto; min-height: 0; }
+  .chat-panel { min-height: min(72vh, 720px); }
+  .chat-header { padding: 12px; gap: 8px; }
+  .chat-header-left { min-width: 0; gap: 9px; }
+  .chat-header-right { min-width: 0; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .messages { padding: 12px; gap: 11px; }
+  .msg-bubble { max-width: calc(100% - 40px); }
+  .chat-composer, .composer, .chat-input-area { min-width: 0; }
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal-backdrop > .modal,
+  .modal-backdrop > [role="dialog"] {
+    width: 100%; max-width: 100%;
+    max-height: 94vh; max-height: 94dvh;
+    border-radius: 16px 16px 0 0;
+    margin: 0;
+  }
+  .modal-header { padding: 13px 16px; }
+  .modal-body { padding: 14px 16px; }
+  .modal-footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .modal-footer .btn, .modal-footer button { flex: 1 1 120px; justify-content: center; }
+  .modal-body .form-grid, .modal-body .detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .modal-body .form-row-full { grid-column: 1; }
+  .ticket-table { min-width: 680px; }
+  #toastContainer { left: 12px !important; right: 12px !important; bottom: 12px; width: auto; }
+}
+
+@media (max-width: 380px) {
+  .main-content { padding: 10px; }
+  .auth-card { padding: 18px 13px; }
+  .chat-header h2 { font-size: .92rem; }
+  .chat-header .support-hours { display: none; }
+  .modal-header { padding-inline: 13px; }
+  .modal-body { padding-inline: 13px; }
+  .modal-footer { padding-inline: 13px; }
+  .modal-footer .btn, .modal-footer button { flex-basis: 100%; }
+  .ticket-table { min-width: 620px; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .modal-backdrop > .modal,
+  .modal-backdrop > [role="dialog"] { max-height: 96vh; max-height: 96dvh; }
+  .modal-header { padding-block: 10px; }
+  .modal-body { padding-block: 12px; }
+  .modal-footer { padding-block: 10px; }
+  .auth-screen { align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal, .auth-card, .view { animation: none !important; }
+}
