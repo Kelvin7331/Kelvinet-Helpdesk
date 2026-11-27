@@ -43,6 +43,10 @@
   <meta name="application-name" content="Kelvinet Smart IT Helpdesk">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Kelvinet Helpdesk">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,7 +62,7 @@
 <div id="authScreen" class="auth-screen">
   <div class="auth-card">
     <div class="auth-brand">
-      <div class="auth-logo"><i class="fas fa-shield-halved"></i></div>
+      <div class="auth-logo"><img src="/logo.png" alt="Kelvinet Smart IT Helpdesk logo" class="auth-brand-image"></div>
       <h1>Kelvinet <span>Helpdesk</span></h1>
       <p>Smart IT Support Platform</p>
     </div>
@@ -736,5 +740,56 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script type="module" src="chatbot.js"></script>
+<style>
+  #pwaInstallButton {
+    position: fixed; right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom)); z-index: 9998;
+    display: none; align-items: center; gap: 9px; padding: 12px 16px;
+    border: 1px solid rgba(0,210,235,.55); border-radius: 999px;
+    background: #071426; color: #f5fbff; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.2;
+    box-shadow: 0 8px 28px rgba(0,0,0,.28); cursor: pointer;
+  }
+  #pwaInstallButton.is-visible { display: inline-flex; }
+  #pwaInstallButton:focus-visible { outline: 3px solid #00d2eb; outline-offset: 3px; }
+  @media (max-width: 380px) { #pwaInstallButton { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); padding: 11px 14px; } }
+</style>
+<button id="pwaInstallButton" type="button" aria-label="Install Kelvinet Smart IT Helpdesk">
+  <i class="fas fa-download" aria-hidden="true"></i><span>Install app</span>
+</button>
+<script>
+(() => {
+  const installButton = document.getElementById('pwaInstallButton');
+  if (!installButton) return;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) return;
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    installButton.classList.add('is-visible');
+  });
+  installButton.addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installButton.disabled = true;
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') installButton.classList.remove('is-visible');
+    } catch (error) {
+      console.warn('[Kelvinet PWA] Install prompt was not completed.', error);
+    } finally {
+      installPrompt = null;
+      installButton.disabled = false;
+    }
+  });
+  window.addEventListener('appinstalled', () => installButton.classList.remove('is-visible'));
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+        .catch(error => console.error('[Kelvinet PWA] Service worker registration failed:', error));
+    });
+  }
+})();
+</script>
 </body>
 </html>
